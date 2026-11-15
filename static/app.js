@@ -773,6 +773,179 @@
     });
   }
 
+  function initWalle() {
+    const robot = $(".walle");
+    const actor = $(".walle-actor");
+    const home = $("#page-home");
+    if (!robot || !actor || !home) return;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const keys = new Set();
+    const autoSpeed = () => Math.max(48, home.clientWidth * 0.06);
+    const manualSpeed = () => Math.max(240, home.clientWidth * 0.28);
+    const verticalSpeed = () => Math.max(220, home.clientHeight * 0.32);
+    const resumeDelay = 1800;
+    let width = robot.offsetWidth || 132;
+    let height = robot.offsetHeight || 130;
+    let x = 0;
+    let y = 0;
+    let direction = 1;
+    let manualUntil = 0;
+    let positioned = false;
+    let lastTime = 0;
+
+    const isHome = () => home.classList.contains("active");
+    const isFormTarget = (target) =>
+      target?.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName);
+
+    const measure = () => {
+      width = robot.offsetWidth || width;
+      height = robot.offsetHeight || height;
+    };
+
+    const setDirection = (value) => {
+      direction = value < 0 ? -1 : 1;
+      actor.style.transform = direction === 1 ? "scaleX(1)" : "scaleX(-1)";
+    };
+
+    const place = () => {
+      robot.style.transform = "translate3d(" + x + "px, " + y + "px, 0)";
+    };
+
+    const clampY = () => {
+      y = Math.max(0, Math.min(y, Math.max(0, home.clientHeight - height)));
+    };
+
+    const wrapY = () => {
+      if (y > home.clientHeight) {
+        y = -height;
+      } else if (y < -height) {
+        y = home.clientHeight;
+      }
+    };
+
+    const wrapX = () => {
+      if (x > home.clientWidth) {
+        x = -width;
+        setDirection(1);
+      } else if (x < -width) {
+        x = home.clientWidth;
+        setDirection(-1);
+      }
+    };
+
+    const position = () => {
+      if (!isHome()) return;
+      measure();
+      if (!positioned) {
+        x = Math.max(0, home.clientWidth * 0.04);
+        y = Math.max(0, home.clientHeight * 0.9 - height);
+        positioned = true;
+        setDirection(1);
+      } else {
+        clampY();
+        if (x > home.clientWidth + width) x = -width;
+        if (x < -width * 2) x = home.clientWidth;
+      }
+      place();
+      robot.classList.add("is-ready");
+    };
+
+    const onKeyDown = (event) => {
+      if (!isHome() || isFormTarget(event.target)) return;
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+        return;
+      }
+      event.preventDefault();
+      if (!positioned) position();
+      keys.add(event.key);
+      manualUntil = performance.now() + resumeDelay;
+      robot.classList.add("is-manual");
+      if (event.key === "ArrowLeft") setDirection(-1);
+      if (event.key === "ArrowRight") setDirection(1);
+      if (!event.repeat) {
+        if (event.key === "ArrowLeft") x -= 10;
+        if (event.key === "ArrowRight") x += 10;
+        if (event.key === "ArrowUp") y -= 10;
+        if (event.key === "ArrowDown") y += 10;
+        wrapX();
+        wrapY();
+        place();
+      }
+    };
+
+    const onKeyUp = (event) => {
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
+        return;
+      }
+      keys.delete(event.key);
+      if (!keys.size) robot.classList.remove("is-manual");
+    };
+
+    const clearKeys = () => {
+      keys.clear();
+      robot.classList.remove("is-manual");
+    };
+
+    const onResize = () => {
+      if (!positioned || !isHome()) return;
+      measure();
+      clampY();
+      if (x > home.clientWidth + width) x = -width;
+      place();
+    };
+
+    const tick = (time) => {
+      const dt = lastTime ? Math.min(0.05, (time - lastTime) / 1000) : 0;
+      lastTime = time;
+      if (!isHome()) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      if (!positioned) position();
+      const manual = keys.size > 0 || performance.now() < manualUntil;
+      if (manual) {
+        let dx = 0;
+        let dy = 0;
+        if (keys.has("ArrowLeft")) dx -= 1;
+        if (keys.has("ArrowRight")) dx += 1;
+        if (keys.has("ArrowUp")) dy -= 1;
+        if (keys.has("ArrowDown")) dy += 1;
+        if (dx !== 0) {
+          x += dx * manualSpeed() * dt;
+          setDirection(dx);
+          wrapX();
+        }
+        if (dy !== 0) {
+          y += dy * verticalSpeed() * dt;
+          wrapY();
+        }
+        if (keys.size) manualUntil = performance.now() + 500;
+        place();
+      } else if (!reducedMotion) {
+        x += direction * autoSpeed() * dt;
+        wrapX();
+        place();
+      }
+      requestAnimationFrame(tick);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", clearKeys);
+    window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", () => {
+      lastTime = 0;
+    });
+    window.addEventListener("hashchange", () => {
+      if (isHome()) position();
+      else clearKeys();
+    });
+    position();
+    requestAnimationFrame(tick);
+  }
+
   function bind() {
     $$(".nav-btn").forEach((button) => {
       button.addEventListener("click", () => switchPage(button.dataset.page));
@@ -806,6 +979,7 @@
 
   async function boot() {
     bind();
+    initWalle();
     const page = pageFromHash();
     switchPage(page, false);
     await loadInfo();

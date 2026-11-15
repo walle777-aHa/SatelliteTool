@@ -33,7 +33,8 @@ optional development tools; Ruff/Black currently require Python 3.10+.
 
 ## Features
 
-- Solid-black home page with four shortcuts;
+- Solid-black home page with four shortcuts and a WALL-E-style robot that wraps
+  across all four edges and can be steered with the arrow keys;
 - Simulation with configurable duration and CSV telemetry profiles;
 - APS osculating/mean element conversion with copy-mean support;
 - SGP4 TLE-to-ECEF propagation;

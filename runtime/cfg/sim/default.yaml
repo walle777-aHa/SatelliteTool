@@ -1,0 +1,26 @@
+sim:
+  simulation_time: 1000
+  environment_name: windows
+  episodes: 1
+  figure_folder: data_plots
+  device: cpu
+  magnification: 200
+  realtime: false
+  watchdog_timeout_s: 5.0
+  GNC_PID:
+    Kp: 3
+    Ki: 0.05
+    Kd: 70
+hal:
+  backend: sil
+  serial:
+    imu:
+      enabled: false
+      port: COM3
+      baud_rate: 115200
+      read_timeout_ms: 20
+      write_timeout_ms: 20
+paths:
+  data_root: data
+  output_dir: SimOutput
+  log_config_dir: modules/log/conf

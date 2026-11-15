@@ -1,0 +1,3 @@
+scenario: baseline
+spacecraft: star_001
+sim: {}

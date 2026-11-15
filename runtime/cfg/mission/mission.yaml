@@ -1,0 +1,4 @@
+mission:
+  name: baseline
+  spacecraft: star_001
+  scenario: baseline

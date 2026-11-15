@@ -1,0 +1,7 @@
+scenario: tutorial_realtime
+spacecraft: star_001
+sim:
+  simulation_time: 2
+  realtime: true
+  magnification: 1
+  watchdog_timeout_s: 5.0

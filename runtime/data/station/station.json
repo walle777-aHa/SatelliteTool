@@ -1,0 +1,14 @@
+{
+  "ground_stations": [
+    { "id": 1, "name": "Kashi", "lat": 38.916667, "lon": 75.866667, "alt": 1255, "valid": true },
+    { "id": 2, "name": "Jiamusi", "lat": 46.762926, "lon": 130.389722, "alt": 136.72, "valid": true },
+    { "id": 3, "name": "Kunming", "lat": 25.533333, "lon": 102.800000, "alt": 18, "valid": true },
+    { "id": 4, "name": "Ürümqi", "lat": 43.466667, "lon": 87.183333, "alt": 10000, "valid": true },
+    { "id": 5, "name": "Neuquén_Argentine", "lat": -39.183333, "lon": -69.866667, "alt": 10, "valid": true },
+    { "id": 6, "name": "Xiongan", "lat": 39.0727150, "lon": 116.019268, "alt": 10.12, "valid": true },
+    { "id": 7, "name": "Wenchang", "lat": 19.598090, "lon": 110.795491, "alt": 14.21, "valid": true },
+    { "id": 8, "name": "Chengmai", "lat": 20.8715, "lon": 110.144191, "alt": 39.98, "valid": true },
+    { "id": 9, "name": "Tongchuan", "lat": 41.553778, "lon": 108.892362, "alt": 840.44, "valid": true },
+    { "id": 10, "name": "Kuerle", "lat": 41.553778, "lon": 86.226794, "alt": 840.44, "valid": true }
+  ]
+}

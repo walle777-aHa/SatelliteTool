@@ -1,0 +1,47 @@
+syntax = "proto2";
+
+package BlueSpace.RunConf;
+
+message BaseParas {
+  optional double control_system_cycle = 1 [default = 0.25];
+  optional double wearth_rad = 2 [default = 7.292115146251017E-5];
+  optional int32 rotorder = 3 [default = 123];
+  optional double pres_light = 4 [default = 4.563E-6];
+  optional SunVecPara sunpara = 5;
+  optional MoonVecPara moonpara = 6;
+  optional ConstParas constpara = 7;
+  optional TimeSpacePara timespacepara = 8;
+}
+
+message TimeSpacePara {
+  optional int32 leap_second = 1 [default = 18];     // GPS与UTC的秒差
+  optional int32 leap_second_bd = 2 [default = 4];   // bd与UTC的秒差
+}
+
+message SunVecPara {
+  optional bool _enable_real_time_cal = 1 [default = true];
+  optional double _es_const = 2 [default = 0.0167086741];
+  optional double _is_const = 3 [default = 0.409093096];
+  optional double _ws_const = 4 [default = -1.3450356];
+  optional double _meandot_const = 5 [default = 1.99096875E-7];
+}
+message MoonVecPara {
+  optional bool _enable_real_time_cal = 1 [default = true];
+  optional double _es_const = 2 [default = 0.0167086741];  
+  optional double _is_const = 3 [default = 0.409093096];
+  optional double _ws_const = 4 [default = -1.3450356];
+  optional double _meandot_const = 5 [default = 1.99096875E-7];
+}
+
+message ConstParas {
+  optional double Math_PI = 1 [default = 3.14159265358979323846];
+  optional double DegtoRad = 2 [default = 0.017453292519943];
+  optional double RadtoDeg = 3 [default = 57.295779513082321];
+  optional double GMofEarth_km = 4 [default = 398600.4418];
+  optional double EarthPoleRadius_m = 5 [default = 6356752.3142];
+  optional double EarthRefRadius_m = 6 [default = 6378136.6];
+  optional double OmegaofEarth_rads = 7 [default = 7.29211514625e-5];
+  optional double Earthg = 8 [default = 9.7803278];
+  optional double EarthFlat = 9 [default = 0.0033528196978961928];
+  optional double MinValue = 10 [default = 1e-9];
+}

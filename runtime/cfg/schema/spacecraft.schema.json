@@ -1,0 +1,216 @@
+{
+  "type": "object",
+  "required": [
+    "DynInfo",
+    "DynProperty",
+    "OrbitInit",
+    "Attitude",
+    "SpaceWeather",
+    "EvtForce",
+    "SatModule",
+    "Gnss",
+    "Gyro",
+    "Star",
+    "Wheel",
+    "Mag",
+    "Sun",
+    "MBar",
+    "Motor",
+    "Engine"
+  ],
+  "properties": {
+    "DynInfo": {
+      "type": "object",
+      "required": [
+        "SateName"
+      ],
+      "properties": {
+        "SateName": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "DynProperty": {
+      "type": "object",
+      "required": [
+        "DynRunStepSec",
+        "GnssUpdateHZ",
+        "SatInitTime"
+      ],
+      "properties": {
+        "DynRunStepSec": {
+          "type": "number",
+          "minimum": 1e-06,
+          "maximum": 10
+        },
+        "GnssUpdateHZ": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "SatInitTime": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": true
+    },
+    "OrbitInit": {
+      "type": "object",
+      "required": [
+        "Propagator",
+        "CoordType",
+        "Epoch",
+        "OrbitValue"
+      ],
+      "properties": {
+        "Propagator": {
+          "type": "integer",
+          "enum": [
+            0,
+            1,
+            2,
+            3
+          ]
+        },
+        "CoordType": {
+          "type": "integer"
+        },
+        "Epoch": {
+          "type": "integer"
+        },
+        "OrbitValue": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "Attitude": {
+      "type": "object",
+      "required": [
+        "AttAngle",
+        "AttRate"
+      ],
+      "properties": {
+        "AttAngle": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "number"
+          }
+        },
+        "AttRate": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "SpaceWeather": {
+      "type": "object",
+      "required": [
+        "Degree",
+        "Order",
+        "CR",
+        "ScatterCR",
+        "CD",
+        "F107"
+      ],
+      "properties": {
+        "Degree": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 520
+        },
+        "Order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 520
+        },
+        "CR": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ScatterCR": {
+          "type": "number",
+          "minimum": 0
+        },
+        "CD": {
+          "type": "number",
+          "minimum": 0
+        },
+        "F107": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "EvtForce": {
+      "type": "object",
+      "required": [
+        "ResMag"
+      ],
+      "properties": {
+        "ResMag": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "SatModule": {
+      "type": "object",
+      "required": [
+        "Mass"
+      ],
+      "properties": {
+        "Mass": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "Gnss": {
+      "type": "array",
+      "minItems": 1
+    },
+    "Gyro": {
+      "type": "array"
+    },
+    "Star": {
+      "type": "array",
+      "minItems": 1
+    },
+    "Wheel": {
+      "type": "array"
+    },
+    "Mag": {
+      "type": "array"
+    },
+    "Sun": {
+      "type": "array"
+    },
+    "MBar": {
+      "type": "array"
+    },
+    "Motor": {
+      "type": "array"
+    },
+    "Engine": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

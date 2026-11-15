@@ -1,0 +1,12 @@
+{
+  "name": "scaled_example",
+  "description": "示例：姿态角缩放/偏移，并输出调度任务流",
+  "delimiter": ",",
+  "columns": [
+    { "name": "t_sec", "source": "time_s", "precision": 3 },
+    { "name": "roll_scaled", "source": "roll_deg", "scale": 0.1, "offset": 0.0, "precision": 6 },
+    { "name": "pitch_scaled", "source": "pitch_deg", "scale": 0.1, "offset": 0.0, "precision": 6 },
+    { "name": "yaw_scaled", "source": "yaw_deg", "scale": 0.1, "offset": 0.0, "precision": 6 },
+    { "name": "task_flow", "source": "task_flow" }
+  ]
+}

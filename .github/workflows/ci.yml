@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compile Python sources
+        run: python -m py_compile app.py test_app.py
+      - name: Run unit tests
+        run: python -m unittest discover -v
+      - name: Check frontend syntax
+        run: node --check static/app.js
+
+  lint:
+    name: lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install development tools
+        run: python -m pip install -r requirements-dev.txt
+      - name: Lint Python
+        run: python -m ruff check .
+      - name: Check Python formatting
+        run: python -m black --check .
+
+  hygiene:
+    name: repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject generated runtime files
+        run: |
+          if git ls-files | grep -E '^(runs/|__pycache__/|\.venv/)'; then
+            echo "runtime output must not be tracked" >&2
+            exit 1
+          fi

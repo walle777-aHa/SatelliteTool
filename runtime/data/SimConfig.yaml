@@ -1,0 +1,10 @@
+simulation_time: 100
+environment_name: windows
+episodes: 1
+figure_folder: data_plots
+device: cpu
+magnification: 200
+GNC_PID:
+  Kp: 3
+  Ki: 0.05
+  Kd: 70

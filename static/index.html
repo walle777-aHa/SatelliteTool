@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SatelliteTool：Windows 本地卫星仿真、APS 轨道转换与 SGP4 TLE 工具。">
+  <meta name="theme-color" content="#000000">
+  <title>SatelliteTool</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">ST</span>
+      <span>SatelliteTool</span>
+    </div>
+    <nav class="nav">
+      <button class="nav-btn active" data-page="home">首页</button>
+      <button class="nav-btn" data-page="sim">仿真</button>
+      <button class="nav-btn" data-page="aps">轨道转换</button>
+      <button class="nav-btn" data-page="tle">TLE 递推</button>
+      <button class="nav-btn" data-page="query">TLE 查询</button>
+    </nav>
+    <div class="top-status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText" aria-live="polite">连接中</span>
+    </div>
+  </header>
+
+  <div id="dataWarning" class="data-warning hidden" role="status" aria-live="polite"></div>
+
+  <main>
+    <section id="page-home" class="page home-page active">
+      <div class="home-content">
+        <div class="home-wordmark">SatelliteTool</div>
+        <p class="home-tagline">卫星仿真 · 轨道转换 · TLE 工具集</p>
+        <div class="home-shortcuts">
+          <button class="home-shortcut" data-go="sim">
+            <span class="shortcut-icon shortcut-sim">SIM</span>
+            <span class="shortcut-label">仿真</span>
+            <span class="shortcut-desc">运行 BlueSpace.exe · 定制 CSV</span>
+          </button>
+          <button class="home-shortcut" data-go="aps">
+            <span class="shortcut-icon shortcut-orbit">APS</span>
+            <span class="shortcut-label">轨道转换</span>
+            <span class="shortcut-desc">瞬根 ↔ 平根</span>
+          </button>
+          <button class="home-shortcut" data-go="tle">
+            <span class="shortcut-icon shortcut-tle">TLE</span>
+            <span class="shortcut-label">TLE 递推</span>
+            <span class="shortcut-desc">地固系 RV 递推</span>
+          </button>
+          <button class="home-shortcut" data-go="query">
+            <span class="shortcut-icon shortcut-query">CAT</span>
+            <span class="shortcut-label">TLE 查询</span>
+            <span class="shortcut-desc">Celestrak NORAD</span>
+          </button>
+        </div>
+        <div class="home-hint">选择上方工具开始</div>
+      </div>
+    </section>
+
+    <section id="page-sim" class="page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">SIMULATION</p>
+          <h2>仿真</h2>
+        </div>
+        <span class="hint">调用 bin/BlueSpace.exe</span>
+      </div>
+      <div class="layout two-column">
+        <div class="panel">
+          <div class="panel-title">运行配置</div>
+          <label class="field">
+            <span>场景</span>
+            <select id="scenarioSelect"></select>
+          </label>
+          <label class="field">
+            <span>仿真时长（秒，留空使用场景默认值）</span>
+            <input id="simulationTime" type="number" min="0" max="1000000" placeholder="例如 100">
+          </label>
+          <label class="field">
+            <span>CSV 输出配置</span>
+            <select id="profileSelect"></select>
+          </label>
+          <p class="field-note" id="profileNote"></p>
+          <div class="button-row">
+            <button class="btn primary" id="runSimulation">运行仿真</button>
+            <button class="btn danger" id="stopSimulation" disabled>停止</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">任务状态</div>
+          <dl class="info-grid" id="jobInfo">
+            <div><dt>状态</dt><dd>未运行</dd></div>
+          </dl>
+          <div class="button-row">
+            <a class="btn ghost hidden" id="downloadCsv" href="#">下载定制 CSV</a>
+            <a class="btn ghost hidden" id="downloadRaw" href="#">下载原始 CSV</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">运行日志</div>
+        <pre id="jobLog" class="console">等待任务...</pre>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">遥测预览</div>
+          <label class="inline-field">
+            <span>曲线列</span>
+            <select id="chartColumn"></select>
+          </label>
+        </div>
+        <canvas id="telemetryChart" width="1200" height="280" aria-label="遥测曲线"></canvas>
+        <div class="table-wrap">
+          <table id="telemetryTable">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">历史任务</div>
+          <div class="button-row compact">
+            <button class="btn ghost" id="refreshJobs">刷新</button>
+            <button class="btn ghost" id="clearJobs">清理历史</button>
+          </div>
+        </div>
+        <div id="jobHistory" class="history-list"></div>
+      </div>
+    </section>
+
+    <section id="page-aps" class="page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">ORBIT CONVERSION</p>
+          <h2>轨道转换</h2>
+        </div>
+        <span class="hint">调用 bin/ApsOrbitTool.exe</span>
+      </div>
+      <div class="layout two-column">
+        <form class="panel" id="apsForm">
+          <div class="panel-title">输入</div>
+          <label class="field"><span>方向</span>
+            <select id="apsMode">
+              <option value="o2m">瞬根 → 平根</option>
+              <option value="m2o">平根 → 瞬根</option>
+            </select>
+          </label>
+          <label class="field"><span>历元（UTC）</span><input id="apsEpoch" value="20260101T000000.0000" required></label>
+          <div class="form-grid">
+            <label class="field"><span>a (km)</span><input id="apsA" type="number" step="any" min="6378.138" value="7000" required></label>
+            <label class="field"><span>e</span><input id="apsE" type="number" step="any" min="0" max="0.999999999" value="0.001" required></label>
+            <label class="field"><span>i (deg)</span><input id="apsI" type="number" step="any" min="0" max="180" value="98" required></label>
+            <label class="field"><span>Ω (deg)</span><input id="apsRaan" type="number" step="any" min="0" max="360" value="30" required></label>
+            <label class="field"><span>ω (deg)</span><input id="apsArgp" type="number" step="any" min="0" max="360" value="40" required></label>
+            <label class="field"><span>M (deg)</span><input id="apsM" type="number" step="any" min="0" max="360" value="50" required></label>
+          </div>
+          <button class="btn primary" type="submit">开始转换</button>
+        </form>
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">结果</div>
+            <button class="btn ghost" id="copyAps" type="button" disabled>复制平根</button>
+          </div>
+          <p id="apsMeta" class="hint">等待输入...</p>
+          <div class="table-wrap">
+            <table class="aps-result-table">
+              <thead>
+                <tr><th scope="col">参数</th><th scope="col">输入</th><th scope="col">瞬根</th><th scope="col">平根</th></tr>
+              </thead>
+              <tbody>
+                <tr><th>a (km)</th>
+                  <td><input id="apsInA" readonly></td>
+                  <td><input id="apsOscA" readonly></td>
+                  <td><input id="apsMeanA" readonly></td>
+                </tr>
+                <tr><th>e</th>
+                  <td><input id="apsInE" readonly></td>
+                  <td><input id="apsOscE" readonly></td>
+                  <td><input id="apsMeanE" readonly></td>
+                </tr>
+                <tr><th>i (deg)</th>
+                  <td><input id="apsInI" readonly></td>
+                  <td><input id="apsOscI" readonly></td>
+                  <td><input id="apsMeanI" readonly></td>
+                </tr>
+                <tr><th>Ω (deg)</th>
+                  <td><input id="apsInRaan" readonly></td>
+                  <td><input id="apsOscRaan" readonly></td>
+                  <td><input id="apsMeanRaan" readonly></td>
+                </tr>
+                <tr><th>ω (deg)</th>
+                  <td><input id="apsInArgp" readonly></td>
+                  <td><input id="apsOscArgp" readonly></td>
+                  <td><input id="apsMeanArgp" readonly></td>
+                </tr>
+                <tr><th>M (deg)</th>
+                  <td><input id="apsInM" readonly></td>
+                  <td><input id="apsOscM" readonly></td>
+                  <td><input id="apsMeanM" readonly></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-tle" class="page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">SGP4</p>
+          <h2>TLE 递推</h2>
+        </div>
+        <span class="hint">调用 bin/Sgp4EcefTool.exe</span>
+      </div>
+      <div class="layout two-column">
+        <form class="panel" id="tleForm">
+          <div class="panel-title">两行 TLE</div>
+          <label class="field"><span>第一行</span><textarea id="tleLine1" rows="3" required>1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753</textarea></label>
+          <label class="field"><span>第二行</span><textarea id="tleLine2" rows="3" required>2 00005  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667</textarea></label>
+          <div class="form-grid three">
+            <label class="field"><span>递推天数</span><input id="tleDuration" type="number" step="any" min="0.001" max="3650" value="2" required></label>
+            <label class="field"><span>步长（分钟）</span><input id="tleStep" type="number" step="any" min="0.1" max="1440" value="2" required></label>
+            <label class="field"><span>输出间隔（分钟）</span><input id="tleSample" type="number" step="any" min="0.1" max="100000" value="120" required></label>
+          </div>
+          <button class="btn primary" type="submit">开始递推</button>
+        </form>
+        <div class="panel">
+          <div class="panel-title">地固系 RV</div>
+          <pre id="tleMeta" class="console">等待输入...</pre>
+          <div class="table-wrap">
+            <table id="tleTable"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-query" class="page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">CELESTRAK</p>
+          <h2>TLE 查询</h2>
+        </div>
+        <span class="hint">在线查询，最多 10 颗</span>
+      </div>
+      <div class="panel">
+        <div class="panel-title">NORAD ID</div>
+        <textarea id="noradIds" rows="2" placeholder="例如：25544, 48274" required></textarea>
+        <div class="button-row">
+          <button class="btn primary" id="queryTle">查询</button>
+          <button class="btn ghost" id="copyAllTle" disabled>复制全部 TLE</button>
+          <span class="hint">支持逗号、空格或换行分隔</span>
+        </div>
+      </div>
+      <div id="queryResults" class="table-wrap query-results"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

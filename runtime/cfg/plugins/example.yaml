@@ -1,0 +1,11 @@
+# P2-2.5 example manifest. The sample library is built as
+# build/<preset>/modules/simulators/example_plugin/<config>/example_plugin.dll
+# (example_plugin.so on Linux). Keep disabled until a deployment copies it.
+plugins:
+  - name: example_plugin
+    type: dynamics
+    library: plugins/example_plugin.dll
+    abi_version: 1
+    enabled: false
+    config:
+      mode: example

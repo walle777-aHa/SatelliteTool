@@ -1,0 +1,32 @@
+# SatelliteTool
+
+Copyright 2026 SatelliteTool contributors
+
+This product is licensed under the Apache License, Version 2.0.
+See LICENSE for the full license text.
+
+The bundled executables in `bin/` are built from the BlueSpace project:
+<https://github.com/walle777-aHa/bluespace>
+BlueSpace is licensed under the Apache License, Version 2.0.
+
+Third-party components included in or linked by the bundled executables:
+
+* Google glog - BSD 3-Clause - <https://github.com/google/glog>
+* gflags - BSD 3-Clause - <https://github.com/gflags/gflags>
+* Protocol Buffers - BSD 3-Clause - <https://github.com/protocolbuffers/protobuf>
+* ERFA - BSD 3-Clause - <https://github.com/liberfa/erfa>
+* Eigen - MPL 2.0 - <https://eigen.tuxfamily.org>
+* yaml-cpp - MIT - <https://github.com/jbeder/yaml-cpp>
+* JSON for Modern C++ (nlohmann/json) - MIT - <https://github.com/nlohmann/json>
+* Vallado SGP4 - author attribution and upstream terms
+  <https://github.com/davidvallado/sgp4>
+
+Runtime scientific data:
+
+* EGM2008 gravity model - NGA
+* IGRF13 / IGRF14 magnetic field models - IAGA
+* IERS EOP C04 Earth orientation data - IERS
+* TLE data queried at runtime - Celestrak
+
+See `third_party/README.md` and `docs/DATA.md` for links, versions, and update
+notes. The bundled data and binaries retain their original upstream terms.

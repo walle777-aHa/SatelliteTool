@@ -1,0 +1,39 @@
+# P1-5 config-driven component plan.
+# Order is resolved from inputs/outputs; module/component priority is the
+# deterministic tie-breaker. Keep this list in sync with registrations.
+components:
+  - name: TimeSpaceComponent
+    module: TimeSpaceModule
+    priority: 0
+  - name: OrbitDynComponent
+    module: SimulationModule
+    priority: 10
+  - name: DriversComponent
+    module: SimulationModule
+    priority: 20
+  - name: EnvironmentComponent
+    module: SimulationModule
+    priority: 30
+  - name: VehicleComponent
+    module: SimulationModule
+    priority: 40
+  - name: PlanetComponent
+    module: SimulationModule
+    priority: 50
+  - name: SensorsPortComponent
+    module: SimulationModule
+    priority: 60
+    config: spacecraft.sensors
+    outputs: [sensors]
+  - name: HouseKeepComponent
+    module: OnboardModule
+    priority: 0
+  - name: PluginComponent
+    module: SimulationModule
+    priority: 70
+    enabled: false
+    config:
+      name: example_plugin
+      type: dynamics
+      library: plugins/example_plugin.dll
+      abi_version: 1

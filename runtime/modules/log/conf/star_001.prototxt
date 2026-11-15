@@ -1,0 +1,12 @@
+home_dir : "./"
+hardware_config_dir : "./"
+algorithm_config_dir : "./"
+dag_file : "./"
+log_level : "info"
+
+slog_config {
+    slog_config {
+        name : "framework"
+        log_level : "info"
+    }
+}

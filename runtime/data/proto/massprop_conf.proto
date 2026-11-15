@@ -1,0 +1,65 @@
+syntax = "proto2";
+
+package BlueSpace.MassProp;
+
+
+message SpacecraftStructure {
+  optional int32 spacex = 1 [default = 1];  // single solar panel
+  optional int32 oneweb = 2 [default = 2];  // double solar panel
+  optional bool surface_mounted = 3 [default = false];
+  optional bool solarpanel_unfold = 4 [default = true];
+  optional bool solarsail_installed = 5 [default = false];
+  optional bool solarsail_unfold = 6 [default = false];
+
+  optional double panel_surface = 7 [default = 20];    //m^2
+  optional double vehicle_surface = 8 [default = 3];  //m^2
+  optional double panel_surface_max = 9 [default = 30];   //m^2
+
+}
+
+message MassPropParas {
+  optional double mass_vehicle = 1 [default = 500];
+  optional double mass_thrusters = 2 [default = 20];
+  optional double mass_solar_panel = 3 [default = 30];
+  optional double mass_solar_sail = 4 [default = 2];  // circular
+
+  optional double coordinate_vehicle_x = 5 [default = 0.01];
+  optional double coordinate_vehicle_y = 6 [default = 0.01];
+  optional double coordinate_vehicle_z = 7 [default = -1.0];
+
+  optional double coordinate_solarpanel_junction_x1 = 8 [default = 0.01];
+  optional double coordinate_solarpanel_junction_y1 = 9 [default = 1.00];
+  optional double coordinate_solarpanel_junction_z1 = 10 [default = -0.5];
+
+  optional double coordinate_solarpanel_junction_x2 = 11 [default = 0.01];
+  optional double coordinate_solarpanel_junction_y2 = 12 [default = -1.00];
+  optional double coordinate_solarpanel_junction_z2 = 13 [default = -0.5];
+
+  optional double coordinate_solarpanel_center_x1 = 14 [default = 0.01];
+  optional double coordinate_solarpanel_center_y1 = 15 [default = 5.51];
+  optional double coordinate_solarpanel_center_z1 = 16 [default = -0.5];
+
+  optional double coordinate_solarpanel_center_x2 = 17 [default = 0.01];
+  optional double coordinate_solarpanel_center_y2 = 18 [default = -5.51];
+  optional double coordinate_solarpanel_center_z2 = 19 [default = -0.5];
+
+  optional double coordinate_solarsail_junction_x = 20 [default = 0.01];
+  optional double coordinate_solarsail_junction_y = 21 [default = 0.01];
+  optional double coordinate_solarsail_junction_z = 22 [default = 0.01];
+
+  optional double coordinate_solarsail_center_x = 23 [default = 0.01];
+  optional double coordinate_solarsail_center_y = 24 [default = 0.01];
+  optional double coordinate_solarsail_center_z = 25 [default = 0.01];
+
+  optional double inertia_vehicle_xx = 26 [default = 333.33];
+  optional double inertia_vehicle_yy = 27 [default = 541.67];
+  optional double inertia_vehicle_zz = 28 [default = 541.67];
+
+  optional double inertia_solarpanel_xx = 29 [default = 80.0125];
+  optional double inertia_solarpanel_yy = 30 [default = 5.0125];
+  optional double inertia_solarpanel_zz = 31 [default = 85];
+
+  optional double inertia_solarsail_xx = 32 [default = 22.797];   // S = 15;
+  optional double inertia_solarsail_yy = 33 [default = 11.4];
+  optional double inertia_solarsail_zz = 34 [default = 11.4];
+}

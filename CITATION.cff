@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use SatelliteTool in research or teaching, please cite it."
+title: "SatelliteTool"
+abstract: "A Windows-local satellite simulation, APS orbit conversion, and SGP4 TLE workbench built around compiled BlueSpace executables."
+type: software
+authors:
+  - name: "SatelliteTool contributors"
+version: "0.2.0"
+date-released: "2026-11-15"
+license: "Apache-2.0"
+keywords:
+  - satellite
+  - orbit
+  - SGP4
+  - APS
+  - TLE
+  - simulation

@@ -1,0 +1,11 @@
+{
+  "name": "attitude_only",
+  "description": "示例：只输出时间与三轴姿态角，并重命名列",
+  "delimiter": ",",
+  "columns": [
+    { "name": "time_s", "source": "time_s", "precision": 3 },
+    { "name": "roll", "source": "roll_deg", "precision": 5 },
+    { "name": "pitch", "source": "pitch_deg", "precision": 5 },
+    { "name": "yaw", "source": "yaw_deg", "precision": 5 }
+  ]
+}

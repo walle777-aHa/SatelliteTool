@@ -1,0 +1,26 @@
+{
+  "ground_stations": [
+    { "id": 1, "lat": 39.505, "lon": 75.929, "alt": 1255, "valid": true },
+    { "id": 2, "lat": 34.445, "lon": 109.494, "alt": 557, "valid": true },
+    { "id": 3, "lat": 18.313, "lon": 109.311, "alt": 18, "valid": true },
+    { "id": 4, "lat": 45.0, "lon": 116.0, "alt": 10, "valid": false },
+    { "id": 5, "lat": 45.0, "lon": 116.0, "alt": 10, "valid": false },
+    { "id": 6, "lat": 45.0, "lon": 116.0, "alt": 10, "valid": false },
+    { "id": 7, "lat": 45.0, "lon": 116.0, "alt": 10, "valid": false },
+    { "id": 8, "lat": 45.0, "lon": 116.0, "alt": 10, "valid": false },
+    { "id": 9, "lat": 45.0, "lon": 116.0, "alt": 10, "valid": false },
+    { "id": 10, "lat": 45.0, "lon": 116.0, "alt": 10, "valid": false }
+  ],
+  "link_windows": [
+    { "ton": 611122200, "toff": 611122800, "station_id": 2, "antenna_id": 1 },
+    { "ton": 611122200, "toff": 611122800, "station_id": 2, "antenna_id": 2 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 },
+    { "ton": 549970804, "toff": 549971460, "station_id": 3, "antenna_id": 1 }
+  ]
+}

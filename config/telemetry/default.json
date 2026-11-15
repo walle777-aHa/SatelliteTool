@@ -1,0 +1,15 @@
+{
+  "name": "default",
+  "description": "默认遥测：保留全部列，数值统一输出 6 位小数",
+  "delimiter": ",",
+  "columns": [
+    { "name": "time_s", "source": "time_s", "precision": 3 },
+    { "name": "roll_deg", "source": "roll_deg", "precision": 6 },
+    { "name": "pitch_deg", "source": "pitch_deg", "precision": 6 },
+    { "name": "yaw_deg", "source": "yaw_deg", "precision": 6 },
+    { "name": "omega_x", "source": "omega_x", "precision": 9 },
+    { "name": "omega_y", "source": "omega_y", "precision": 9 },
+    { "name": "omega_z", "source": "omega_z", "precision": 9 },
+    { "name": "task_flow", "source": "task_flow" }
+  ]
+}

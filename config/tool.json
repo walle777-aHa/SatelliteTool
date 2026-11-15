@@ -1,0 +1,37 @@
+{
+  "name": "SatelliteTool",
+  "version": "0.2.0",
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "executables": {
+    "simulation": "bin/BlueSpace.exe",
+    "aps": "bin/ApsOrbitTool.exe",
+    "sgp4": "bin/Sgp4EcefTool.exe"
+  },
+  "runtime": {
+    "working_directory": "runtime",
+    "config_root": "cfg",
+    "data_root": "data",
+    "log_config_dir": "modules/log/conf",
+    "default_scenario": "baseline",
+    "default_csv_profile": "default"
+  },
+  "telemetry": {
+    "profiles_dir": "config/telemetry"
+  },
+  "celestrak": {
+    "timeout_s": 20,
+    "cache_ttl_s": 300
+  },
+  "limits": {
+    "max_simulation_time_s": 1000000,
+    "max_sgp4_samples": 20000,
+    "preview_scan_rows_running": 200000,
+    "preview_scan_rows_finished": 2000000
+  },
+  "history": {
+    "keep_jobs": 50
+  }
+}

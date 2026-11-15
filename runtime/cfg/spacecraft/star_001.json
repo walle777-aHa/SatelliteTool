@@ -1,0 +1,1450 @@
+{
+  "DynInfo": {
+    "Version": "0.0.1",
+    "SeriesName": "StarHalo",
+    "SateName": "star_001",
+    "SateMessage": "配置初始化"
+  },
+  "DynProperty": {
+    "DynRunStepSec": 0.05,
+    "GnssUpdateHZ": 1,
+    "SatInitTime": 1747195200.0,
+    "Am2b": [
+      [
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1
+      ]
+    ],
+    "MachCtrInBodyVet": [
+      0,
+      0,
+      0
+    ],
+    "DateUpdateSwh": true
+  },
+  "OrbitInit": {
+    "Propagator": 3,
+    "CoordType": 0,
+    "Epoch": 1747195200,
+    "OrbitValue": [
+      6928137,
+      0,
+      51.6335,
+      0,
+      0,
+      0
+    ]
+  },
+  "Attitude": {
+    "AttAngleType": 1,
+    "AttAngle": [
+      100,
+      100,
+      100
+    ],
+    "AttRateType": 1,
+    "AttRate": [
+      0,
+      0,
+      0
+    ]
+  },
+  "SpaceWeather": {
+    "Degree": 21,
+    "Order": 21,
+    "CR": 1,
+    "ScatterCR": 0.2,
+    "CD": 2.2,
+    "F107": 150
+  },
+  "EvtForce": {
+    "GraGradTorCft": 1,
+    "DragTorCft": 1,
+    "ResMagTorCft": 1,
+    "SolarTorCft": 1,
+    "EngineTorCft": 1,
+    "ResSatMasCtrOftMag": [
+      0,
+      0,
+      0
+    ],
+    "SatInaCft": 1,
+    "ResMag": [
+      2,
+      2,
+      -2
+    ]
+  },
+  "SatModule": {
+    "Mass": 664.36,
+    "ModuleExpandFlagCount": 2,
+    "ModuleExpandFlagName": [
+      "+YSADA",
+      "-YSADA",
+      "机构2",
+      "机构3",
+      "机构4",
+      "机构5",
+      "机构6",
+      "机构7"
+    ],
+    "ModuleExpandFlag": [
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ],
+    "SatInaCptSwh": true,
+    "FixInlMatLst": [],
+    "MassPro": {
+      "SatBody": {
+        "NodeName": "卫星本体",
+        "ID": 1,
+        "ExpandMass": 584.8,
+        "ExpandMassCenter": [
+          0.0485,
+          0.0072,
+          0.56218
+        ],
+        "ExpandRotaryInertia": [
+          [
+            130,
+            0,
+            0
+          ],
+          [
+            0,
+            514,
+            0
+          ],
+          [
+            0,
+            0,
+            549
+          ]
+        ],
+        "CollapseMass": 584.8,
+        "CollapseMassCenter": [
+          0.0485,
+          0.0072,
+          0.56218
+        ],
+        "CollapseRotaryInertia": [
+          [
+            130,
+            0,
+            0
+          ],
+          [
+            0,
+            514,
+            0
+          ],
+          [
+            0,
+            0,
+            549
+          ]
+        ]
+      },
+      "ChildPartLst": [
+        {
+          "NodeName": "+Y连杆",
+          "ID": 2,
+          "ParentID": 1,
+          "RoteAxis": 0,
+          "MotorIdx": 2,
+          "ModuleFlagIdx": 0,
+          "Collapse": {
+            "Mass": 0,
+            "MassCenter": [
+              0,
+              0,
+              0
+            ],
+            "RotaryInertia": [
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ]
+            ],
+            "ConnectPoint": [
+              0,
+              0,
+              0
+            ],
+            "RotateDcm": [
+              [
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                1
+              ]
+            ]
+          },
+          "Expand": {
+            "Mass": 4.823,
+            "MassCenter": [
+              1.25,
+              -0.005,
+              0
+            ],
+            "RotaryInertia": [
+              [
+                0.02,
+                0,
+                0
+              ],
+              [
+                0,
+                1.991,
+                0
+              ],
+              [
+                0,
+                0,
+                2.007
+              ]
+            ],
+            "ConnectPoint": [
+              -0.141,
+              0.479105,
+              0.408081
+            ],
+            "RotateDcm": [
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                -1
+              ]
+            ]
+          }
+        },
+        {
+          "NodeName": "+Y太阳翼",
+          "ID": 3,
+          "ParentID": 2,
+          "RoteAxis": 1,
+          "MotorIdx": 3,
+          "ModuleFlagIdx": 0,
+          "Collapse": {
+            "Mass": 0,
+            "MassCenter": [
+              0,
+              0,
+              0
+            ],
+            "RotaryInertia": [
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ]
+            ],
+            "ConnectPoint": [
+              0,
+              0,
+              0
+            ],
+            "RotateDcm": [
+              [
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                1
+              ]
+            ]
+          },
+          "Expand": {
+            "Mass": 34.228,
+            "MassCenter": [
+              2.216,
+              0,
+              0.016
+            ],
+            "RotaryInertia": [
+              [
+                12.65,
+                0,
+                0
+              ],
+              [
+                0,
+                53.476,
+                0
+              ],
+              [
+                0,
+                0,
+                66.115
+              ]
+            ],
+            "ConnectPoint": [
+              1.7749,
+              0,
+              -0.01344
+            ],
+            "RotateDcm": [
+              [
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                1
+              ]
+            ]
+          }
+        },
+        {
+          "NodeName": "-Y连杆",
+          "ID": 4,
+          "ParentID": 1,
+          "RoteAxis": 0,
+          "MotorIdx": 6,
+          "ModuleFlagIdx": 1,
+          "Collapse": {
+            "Mass": 0,
+            "MassCenter": [
+              0,
+              0,
+              0
+            ],
+            "RotaryInertia": [
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ]
+            ],
+            "ConnectPoint": [
+              0,
+              0,
+              0
+            ],
+            "RotateDcm": [
+              [
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                1
+              ]
+            ]
+          },
+          "Expand": {
+            "Mass": 4.823,
+            "MassCenter": [
+              1.25,
+              -0.005,
+              0
+            ],
+            "RotaryInertia": [
+              [
+                0.02,
+                0,
+                0
+              ],
+              [
+                0,
+                1.991,
+                0
+              ],
+              [
+                0,
+                0,
+                2.007
+              ]
+            ],
+            "ConnectPoint": [
+              -0.141,
+              -0.479105,
+              0.408081
+            ],
+            "RotateDcm": [
+              [
+                0,
+                -1,
+                0
+              ],
+              [
+                -1,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                -1
+              ]
+            ]
+          }
+        },
+        {
+          "NodeName": "-Y太阳翼",
+          "ID": 5,
+          "ParentID": 4,
+          "RoteAxis": 1,
+          "MotorIdx": 7,
+          "ModuleFlagIdx": 1,
+          "Collapse": {
+            "Mass": 0,
+            "MassCenter": [
+              0,
+              0,
+              0
+            ],
+            "RotaryInertia": [
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ]
+            ],
+            "ConnectPoint": [
+              0,
+              0,
+              0
+            ],
+            "RotateDcm": [
+              [
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                1
+              ]
+            ]
+          },
+          "Expand": {
+            "Mass": 34.228,
+            "MassCenter": [
+              2.216,
+              0,
+              0.016
+            ],
+            "RotaryInertia": [
+              [
+                12.65,
+                0,
+                0
+              ],
+              [
+                0,
+                53.476,
+                0
+              ],
+              [
+                0,
+                0,
+                66.115
+              ]
+            ],
+            "ConnectPoint": [
+              1.7749,
+              0,
+              -0.01344
+            ],
+            "RotateDcm": [
+              [
+                1,
+                0,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                1
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "PanelPro": {
+      "SatBody": {
+        "NodeName": "卫星本体",
+        "ID": 1
+      },
+      "ChildPantLst": []
+    }
+  },
+  "Gnss": [
+    {
+      "ID": 0,
+      "PwrSte": true,
+      "PosNoise": [
+        10,
+        10,
+        10
+      ],
+      "VelNoise": [
+        0.1,
+        0.1,
+        0.1
+      ],
+      "PosVetB": [
+        0,
+        0,
+        -1
+      ],
+      "OcclusionCalSwh": false,
+      "EarthObsAng": 90
+    }
+  ],
+  "Gyro": [
+    {
+      "ID": 0,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          -1
+        ]
+      ],
+      "BisVal": [
+        0,
+        0,
+        0
+      ],
+      "Noise": [
+        0.000565685,
+        0.000565685,
+        0.000565685
+      ],
+      "Temp": [
+        25,
+        25,
+        25
+      ]
+    },
+    {
+      "ID": 1,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          -1
+        ]
+      ],
+      "BisVal": [
+        0,
+        0,
+        0
+      ],
+      "Noise": [
+        0.000565685,
+        0.000565685,
+        0.000565685
+      ],
+      "Temp": [
+        25,
+        25,
+        25
+      ]
+    }
+  ],
+  "Star": [
+    {
+      "ID": 0,
+      "PwrSte": true,
+      "PosQbs": [
+        -0.139862393323383,
+        0.770150173552461,
+        0.179301076536191,
+        0.595951629802229
+      ],
+      "BisQuat": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "OcclusionCalSwh": true,
+      "EarthObsAng": 25,
+      "SunObsAng": 30,
+      "AttNoise": [
+        5e-05,
+        5e-05,
+        5e-05
+      ],
+      "RateNoise": [
+        0,
+        0,
+        0
+      ],
+      "Temp": 25
+    },
+    {
+      "ID": 1,
+      "PwrSte": true,
+      "PosQbs": [
+        -0.258380930579075,
+        -0.930593240946604,
+        -0.070353728623793,
+        -0.24957136752103
+      ],
+      "BisQuat": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "OcclusionCalSwh": true,
+      "EarthObsAng": 25,
+      "SunObsAng": 30,
+      "AttNoise": [
+        5e-05,
+        5e-05,
+        5e-05
+      ],
+      "RateNoise": [
+        0,
+        0,
+        0
+      ],
+      "Temp": 25
+    },
+    {
+      "ID": 2,
+      "PwrSte": true,
+      "PosQbs": [
+        -0.140443332456174,
+        -0.771887820799153,
+        -0.180526970151498,
+        0.593190420959796
+      ],
+      "BisQuat": [
+        1,
+        0,
+        0,
+        0
+      ],
+      "OcclusionCalSwh": true,
+      "EarthObsAng": 30,
+      "SunObsAng": 35,
+      "AttNoise": [
+        5e-05,
+        5e-05,
+        5e-05
+      ],
+      "RateNoise": [
+        0,
+        0,
+        0
+      ],
+      "Temp": 25
+    }
+  ],
+  "Wheel": [
+    {
+      "ID": 0,
+      "PwrSte": true,
+      "PosVetB": [
+        0.642787609686539,
+        0.347776891302,
+        -0.682547042741286
+      ],
+      "Speed": 0,
+      "TorqueLmt": 0.2,
+      "SpeedLmt": 4100,
+      "Inertia": 0.035809862195676,
+      "SpeedNoise": 0,
+      "TorNoise": 0,
+      "SliFriTor": 0.0001,
+      "KepAftSecInTorMod": 3,
+      "Temp": 25,
+      "Tau": 0.3
+    },
+    {
+      "ID": 1,
+      "PwrSte": true,
+      "PosVetB": [
+        0.642787609686539,
+        -0.347770345769024,
+        -0.682547042741286
+      ],
+      "Speed": 0,
+      "TorqueLmt": 0.2,
+      "SpeedLmt": 4100,
+      "Inertia": 0.035809862195676,
+      "SpeedNoise": 0,
+      "TorNoise": 0,
+      "SliFriTor": 0.0001,
+      "KepAftSecInTorMod": 3,
+      "Temp": 25,
+      "Tau": 0.3
+    },
+    {
+      "ID": 2,
+      "PwrSte": true,
+      "PosVetB": [
+        -0.642787609686539,
+        0.347776891302,
+        -0.682547042741286
+      ],
+      "Speed": 0,
+      "TorqueLmt": 0.2,
+      "SpeedLmt": 4100,
+      "Inertia": 0.035809862195676,
+      "SpeedNoise": 0,
+      "TorNoise": 0,
+      "SliFriTor": 0.0001,
+      "KepAftSecInTorMod": 3,
+      "Temp": 25,
+      "Tau": 0.3
+    },
+    {
+      "ID": 3,
+      "PwrSte": true,
+      "PosVetB": [
+        -0.642787609686539,
+        -0.347776891302,
+        -0.682547042741286
+      ],
+      "Speed": 0,
+      "TorqueLmt": 0.2,
+      "SpeedLmt": 4100,
+      "Inertia": 0.035809862195676,
+      "SpeedNoise": 0,
+      "TorNoise": 0,
+      "SliFriTor": 0.0001,
+      "KepAftSecInTorMod": 3,
+      "Temp": 25,
+      "Tau": 0.3
+    }
+  ],
+  "Mag": [
+    {
+      "ID": 0,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0.587785252292473,
+          0.809016994374947
+        ],
+        [
+          0,
+          -0.809016994374947,
+          0.587785252292473
+        ]
+      ],
+      "BisVal": [
+        0,
+        0,
+        0
+      ],
+      "Noise": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "Temp": [
+        25,
+        25,
+        25
+      ],
+      "MBar": []
+    },
+    {
+      "ID": 1,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          1,
+          0,
+          0
+        ],
+        [
+          0,
+          0.587785252292473,
+          0.809016994374947
+        ],
+        [
+          0,
+          -0.809016994374947,
+          0.587785252292473
+        ]
+      ],
+      "BisVal": [
+        0,
+        0,
+        0
+      ],
+      "Noise": [
+        0.001,
+        0.001,
+        0.001
+      ],
+      "Temp": [
+        25,
+        25,
+        25
+      ],
+      "MBar": []
+    }
+  ],
+  "Sun": [
+    {
+      "ID": 0,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          0,
+          0,
+          -1
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "NormalVetMat": [
+        [
+          0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          0.70710678,
+          -0.70710678
+        ],
+        [
+          -0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          -0.70710678,
+          -0.70710678
+        ]
+      ],
+      "CurrentMax": 0.095,
+      "Noise": [
+        0.0012,
+        0.0012,
+        0.0012,
+        0.0012
+      ],
+      "OcclusionCalSwh": true,
+      "SatModuleComID": 0
+    },
+    {
+      "ID": 1,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ]
+      ],
+      "NormalVetMat": [
+        [
+          0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          0.70710678,
+          -0.70710678
+        ],
+        [
+          -0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          -0.70710678,
+          -0.70710678
+        ]
+      ],
+      "CurrentMax": 0.095,
+      "Noise": [
+        0.0012,
+        0.0012,
+        0.0012,
+        0.0012
+      ],
+      "OcclusionCalSwh": true,
+      "SatModuleComID": 0
+    },
+    {
+      "ID": 2,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          0,
+          0,
+          -1
+        ],
+        [
+          0,
+          -1,
+          0
+        ],
+        [
+          -1,
+          0,
+          0
+        ]
+      ],
+      "NormalVetMat": [
+        [
+          0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          0.70710678,
+          -0.70710678
+        ],
+        [
+          -0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          -0.70710678,
+          -0.70710678
+        ]
+      ],
+      "CurrentMax": 0.095,
+      "Noise": [
+        0.0012,
+        0.0012,
+        0.0012,
+        0.0012
+      ],
+      "OcclusionCalSwh": true,
+      "SatModuleComID": 0
+    },
+    {
+      "ID": 3,
+      "PwrSte": true,
+      "PosMatAb2s": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          0,
+          -1
+        ]
+      ],
+      "NormalVetMat": [
+        [
+          0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          0.70710678,
+          -0.70710678
+        ],
+        [
+          -0.70710678,
+          0,
+          -0.70710678
+        ],
+        [
+          0,
+          -0.70710678,
+          -0.70710678
+        ]
+      ],
+      "CurrentMax": 0.095,
+      "Noise": [
+        0.0012,
+        0.0012,
+        0.0012,
+        0.0012
+      ],
+      "OcclusionCalSwh": true,
+      "SatModuleComID": 0
+    }
+  ],
+  "MBar": [
+    {
+      "ID": 0,
+      "PwrSte": true,
+      "PosVetB": [
+        1,
+        0,
+        0
+      ],
+      "CurrLmt": 0.3,
+      "Noise": 0,
+      "CurCftToMot": 558.4096493187402,
+      "Tau": 0.5
+    },
+    {
+      "ID": 1,
+      "PwrSte": true,
+      "PosVetB": [
+        0,
+        1,
+        0
+      ],
+      "CurrLmt": 0.3,
+      "Noise": 0,
+      "CurCftToMot": 558.4096493187402,
+      "Tau": 0.5
+    },
+    {
+      "ID": 2,
+      "PwrSte": true,
+      "PosVetB": [
+        0,
+        0,
+        1
+      ],
+      "CurrLmt": 0.3,
+      "Noise": 0,
+      "CurCftToMot": 558.4096493187402,
+      "Tau": 0.5
+    }
+  ],
+  "Motor": [
+    {
+      "ID": 0,
+      "MotorName": "QV1A",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 180,
+      "Polarity": -1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 215.8154,
+      "NoCmdSec": 3,
+      "AngLmtMin": 0,
+      "AngLmtMax": 0,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": []
+    },
+    {
+      "ID": 1,
+      "MotorName": "QV1B",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 30,
+      "Polarity": -1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 166.0197,
+      "NoCmdSec": 3,
+      "AngLmtMin": 0,
+      "AngLmtMax": 0,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": []
+    },
+    {
+      "ID": 2,
+      "MotorName": "+YA",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 0,
+      "Polarity": 1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 0,
+      "NoCmdSec": 3,
+      "AngLmtMin": 0,
+      "AngLmtMax": 0,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": [
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 359.2657,
+          "PHallAngle": 0.7343,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        },
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 359.2119,
+          "PHallAngle": 0.7254,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        }
+      ]
+    },
+    {
+      "ID": 3,
+      "MotorName": "+YB",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 0,
+      "Polarity": 1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 0,
+      "NoCmdSec": 3,
+      "AngLmtMin": -40,
+      "AngLmtMax": 40,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": [
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 349.47,
+          "PHallAngle": 10.53,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        },
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 348.804,
+          "PHallAngle": 10.89,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        }
+      ]
+    },
+    {
+      "ID": 4,
+      "MotorName": "QV2A",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 180,
+      "Polarity": -1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 124.7102,
+      "NoCmdSec": 3,
+      "AngLmtMin": 0,
+      "AngLmtMax": 0,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": []
+    },
+    {
+      "ID": 5,
+      "MotorName": "QV2B",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 30,
+      "Polarity": 1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 171.9889,
+      "NoCmdSec": 3,
+      "AngLmtMin": 0,
+      "AngLmtMax": 0,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": []
+    },
+    {
+      "ID": 6,
+      "MotorName": "-YA",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 0,
+      "Polarity": 1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 0,
+      "NoCmdSec": 3,
+      "AngLmtMin": 0,
+      "AngLmtMax": 0,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": [
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 359.2299,
+          "PHallAngle": 0.7701,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        },
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 359.2657,
+          "PHallAngle": 0.797,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        }
+      ]
+    },
+    {
+      "ID": 7,
+      "MotorName": "-YB",
+      "PwrSte": true,
+      "AngleTypeBySys": true,
+      "Angle": 0,
+      "Polarity": 1,
+      "Noise": 0,
+      "RunEnable": false,
+      "UsrAngle": 0,
+      "ResolverOffset": 0,
+      "NoCmdSec": 3,
+      "AngLmtMin": -40,
+      "AngLmtMax": 40,
+      "UsrAngLmtMin": 0,
+      "UsrAngLmtMax": 0,
+      "SpeedLmt": 10,
+      "AccLmt": 10,
+      "ZeroSpeedLmt": 0,
+      "Hall": [
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 349.236,
+          "PHallAngle": 10.566,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        },
+        {
+          "HallEnb": false,
+          "AngleTypeBySys": true,
+          "NHallAngle": 349.65,
+          "PHallAngle": 10.062,
+          "NHallUserAngle": 0,
+          "PHallUserAngle": 0,
+          "NHallZeroRunSec": 0,
+          "PHallZeroRunSec": 0
+        }
+      ]
+    }
+  ],
+  "Engine": [
+    {
+      "ID": 0,
+      "PwrSte": false,
+      "EngineValue": 0.04,
+      "InstallPointM": [
+        -1.5,
+        0,
+        0.4
+      ],
+      "EngineDirectionM": [
+        1,
+        0,
+        0
+      ],
+      "PrepareTime": 160
+    }
+  ]
+}

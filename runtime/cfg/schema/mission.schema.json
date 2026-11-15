@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "required": [
+    "mission"
+  ],
+  "properties": {
+    "mission": {
+      "type": "object",
+      "required": [
+        "name",
+        "spacecraft"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "spacecraft": {
+          "type": "string"
+        },
+        "scenario": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

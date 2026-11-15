@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "required": [
+    "scenario"
+  ],
+  "properties": {
+    "scenario": {
+      "type": "string",
+      "minLength": 1
+    },
+    "spacecraft": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sim": {
+      "type": "object"
+    },
+    "paths": {
+      "type": "object"
+    },
+    "hal": {
+      "type": "object"
+    },
+    "mission": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

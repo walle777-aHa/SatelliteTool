@@ -49,6 +49,25 @@ PREVIEW_CACHE: Dict[Tuple[str, int, int, int, int, Optional[int]], Dict[str, Any
 PREVIEW_CACHE_LOCK = threading.Lock()
 PREVIEW_CACHE_MAX = 8
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+STATIC_MIME_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".map": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+    ".txt": "text/plain; charset=utf-8",
+}
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -1320,9 +1339,11 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "文件不存在")
         if not target.is_file():
             raise ApiError(404, "文件不存在")
-        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
-        if content_type.startswith("text/"):
-            content_type += "; charset=utf-8"
+        content_type = STATIC_MIME_TYPES.get(target.suffix.lower())
+        if not content_type:
+            content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+            if content_type.startswith("text/"):
+                content_type += "; charset=utf-8"
         data = target.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", content_type)

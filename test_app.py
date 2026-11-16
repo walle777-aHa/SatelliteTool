@@ -148,6 +148,14 @@ class ValidationTest(unittest.TestCase):
         self.assertEqual(app.read_json_body(JsonHandler()), {"ok": True})
 
 
+class StaticMimeTypeTest(unittest.TestCase):
+    def test_script_and_style_types_are_executable(self):
+        self.assertTrue(app.STATIC_MIME_TYPES[".js"].startswith("text/javascript"))
+        self.assertTrue(app.STATIC_MIME_TYPES[".css"].startswith("text/css"))
+        self.assertEqual(app.STATIC_MIME_TYPES[".html"], "text/html; charset=utf-8")
+        self.assertEqual(app.STATIC_MIME_TYPES[".svg"], "image/svg+xml")
+
+
 class ProfileValidationTest(unittest.TestCase):
     def test_rejects_duplicate_names_and_bad_precision(self):
         with tempfile.TemporaryDirectory() as temporary:

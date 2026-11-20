@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- F10.7 空间环境页：NASA OMNI2 最新日值、81 天均值和近半年曲线，
+  支持复制曲线 CSV；
+- TLE 查询页 NORAD ID 本地保存：`config/user/norad_ids.txt`，
+  左侧列表支持添加和删除；
+- 新增 API：`GET /api/f107`、`GET/POST /api/norad/saved`、
+  `POST /api/norad/saved/delete`；
+- 单元测试扩展到 21 项，覆盖 NORAD 保存/删除和 F10.7 解析。
+
 ## 0.2.0 - 2026-11-15
 
 ### Changed

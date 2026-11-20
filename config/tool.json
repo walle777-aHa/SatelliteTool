@@ -25,6 +25,11 @@
     "timeout_s": 20,
     "cache_ttl_s": 300
   },
+  "f107": {
+    "timeout_s": 20,
+    "cache_ttl_s": 1800,
+    "window_days": 183
+  },
   "limits": {
     "max_simulation_time_s": 1000000,
     "max_sgp4_samples": 20000,

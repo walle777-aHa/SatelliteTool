@@ -44,15 +44,22 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
 | --- | --- | --- |
 | ![轨道转换](docs/screenshots/aps.png) | ![TLE 递推](docs/screenshots/tle.png) | ![TLE 查询](docs/screenshots/query.png) |
 
+| F10.7 空间环境 |
+| --- |
+| ![F10.7 空间环境](docs/screenshots/f107.png) |
+
 ## 2. 功能
 
-- **首页**：纯黑背景、四个快捷入口和 WALL-E 风格机器人；机器人从上下左右
+- **首页**：纯黑背景、五个快捷入口和 WALL-E 风格机器人；机器人从上下左右
   任一边完全离开后都会从对侧进入，并支持方向键控制；
 - **仿真**：选择场景、仿真时长和 CSV 配置，运行 `BlueSpace.exe`；
   预览表显示前 20 行，曲线对完整数据流式降采样；
 - **轨道转换**：调用 `ApsOrbitTool.exe`，结果按输入表单展示，支持一键复制平根；
 - **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度；
-- **TLE 查询**：Celestrak 查询最多 10 个 NORAD ID，结果按行展示，支持单行/全部复制；
+- **TLE 查询**：Celestrak 查询最多 10 个 NORAD ID，结果按行展示，支持单行/全部
+  复制；左侧保存列表支持保存、添加和删除本地 NORAD ID；
+- **F10.7 空间环境**：NASA OMNI2 最新日值、81 天均值和近 183 天曲线，
+  支持复制曲线 CSV；
 - **CSV 定制**：按 JSON 配置选择列、重命名、缩放、偏移和精度；
 - **历史任务**：日志、原始 CSV、定制 CSV、调度统计；支持清理历史；
 - **安全/资源边界**：本机监听、Host/Origin 校验、统一错误、仿真/SGP4/预览上限。
@@ -65,7 +72,8 @@ SatelliteTool/
 ├── start.bat                  # Windows 启动脚本
 ├── config/
 │   ├── tool.json              # exe 路径、运行目录、限制、历史策略
-│   └── telemetry/             # CSV 输出配置
+│   ├── telemetry/             # CSV 输出配置
+│   └── user/                  # 本地保存的 NORAD ID（git 忽略）
 ├── bin/                       # BlueSpace/APS/SGP4 exe、DLL、SHA256SUMS
 ├── runtime/
 │   ├── cfg/                   # BlueSpace 分层配置
@@ -108,6 +116,8 @@ SatelliteTool/
     "default_csv_profile": "default"
   },
   "telemetry": { "profiles_dir": "config/telemetry" },
+  "celestrak": { "timeout_s": 20, "cache_ttl_s": 300 },
+  "f107": { "timeout_s": 20, "cache_ttl_s": 1800, "window_days": 183 },
   "limits": {
     "max_simulation_time_s": 1000000,
     "max_sgp4_samples": 20000,
@@ -178,6 +188,14 @@ SatelliteTool/
 入轨日期、TLE 历元与两行 TLE；每行可单独复制，也可复制全部成功结果。
 离线时按 ID 返回错误，不影响其他卫星。
 
+左侧“已保存 NORAD ID”读取 `config/user/norad_ids.txt`；保存按钮把当前查询栏
+中的 ID 追加到本地文件，列表中的“添加”写入查询栏，“删除”同时从列表和文件移除。
+
+### F10.7 空间环境
+
+展示 NASA OMNI2 的最新日 F10.7（1 AU 调整值）、81 天均值和近 183 天变化曲线；
+数据缓存 30 分钟，“刷新数据”强制重新拉取。曲线数据可一键复制为 CSV。
+
 ## 6. HTTP API
 
 | 方法 | 路径 | 说明 |
@@ -190,7 +208,11 @@ SatelliteTool/
 | GET | `/api/jobs/<id>?limit=N` | 任务详情与 CSV 预览 |
 | GET | `/api/jobs/<id>/log?tail=N` | 日志尾部 |
 | GET | `/api/jobs/<id>/file?name=...` | 下载产物 |
+| GET | `/api/norad/saved` | 读取已保存的 NORAD ID |
+| GET | `/api/f107?refresh=1` | F10.7 最新值与近半年序列 |
 | POST | `/api/run` | `{scenario, simulation_time?, csv_profile}` |
+| POST | `/api/norad/saved` | 保存 `{norad_ids}`（追加去重） |
+| POST | `/api/norad/saved/delete` | 删除 `{norad_id}` |
 | POST | `/api/jobs/<id>/stop` | 停止当前任务 |
 | DELETE | `/api/jobs/<id>` | 删除任务 |
 | DELETE | `/api/jobs` | 清理所有非运行中任务 |
@@ -226,8 +248,8 @@ python -m black --check .
 node --check static/app.js
 ```
 
-当前测试 17 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
-Host/Origin、Content-Type 和任务清理。
+当前测试 21 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
+Host/Origin、Content-Type、任务清理、NORAD 保存/删除和 F10.7 解析。
 
 `app.py` 运行时只使用 Python 标准库，支持 Python 3.9+。Ruff/Black 开发工具
 当前要求 Python 3.10+；CI 在 Python 3.12 上执行 lint，在 3.9–3.13 上执行测试。
@@ -241,7 +263,8 @@ Node.js 仅用于前端语法检查。
   [bin/README.md](bin/README.md)；
 - 第三方组件、SGP4 署名和数据来源见 [NOTICE](NOTICE)、
   [third_party/README.md](third_party/README.md)；
-- EGM2008、IGRF、EOP、Celestrak 的版本和更新方式见 [docs/DATA.md](docs/DATA.md)；
+- EGM2008、IGRF、EOP、Celestrak、NASA OMNI2 的版本和更新方式见
+  [docs/DATA.md](docs/DATA.md)；
 - 首页已改为纯黑背景，仓库不再包含背景图片；
 - 维护者当前主要面向研究与教学用途，第三方数据/二进制遵循原始许可。
 

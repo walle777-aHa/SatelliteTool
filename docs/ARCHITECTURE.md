@@ -40,7 +40,9 @@ app.py（标准库 ThreadingHTTPServer）
 5. 仿真结束后，后端把 `output/sim_data.csv` 按 CSV 配置导出为
    `telemetry.csv`，并写入 `job.json`；
 6. APS/SGP4：同步调用对应 exe，读取 stdout JSON 返回浏览器；
-7. TLE 查询：并发访问 Celestrak，结果按 NORAD ID 缓存。
+7. TLE 查询：并发访问 Celestrak，结果按 NORAD ID 缓存；
+8. F10.7：读取 NASA OMNI2 当前年和上一年文件，计算日值和 81 天均值，缓存 30 分钟；
+9. NORAD 保存：读写 `config/user/norad_ids.txt`，支持追加和单条删除。
 
 ## 任务生命周期
 
@@ -58,6 +60,7 @@ app.py（标准库 ThreadingHTTPServer）
 - POST 要求 `Content-Type: application/json`；
 - 响应带 CSP、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`；
 - 任务 ID、下载路径、场景名、CSV 配置名和 NORAD ID 均做白名单/越界校验；
+- NORAD 保存文件固定为 `config/user/norad_ids.txt`，不接受外部路径；
 - 非本机监听必须显式 `--allow-remote`，当前版本没有鉴权，不建议公网使用。
 
 ## 资源限制
@@ -74,6 +77,7 @@ app.py（标准库 ThreadingHTTPServer）
 | --- | --- |
 | `bin/` | 编译好的 exe 和 DLL |
 | `config/` | 工具配置和 CSV 配置 |
+| `config/user/` | 本地保存的 NORAD ID（git 忽略） |
 | `runtime/cfg/` | BlueSpace 分层配置 |
 | `runtime/data/` | EOP、重力场、磁场等数据 |
 | `static/` | 前端页面、样式、脚本、favicon |

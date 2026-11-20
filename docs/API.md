@@ -123,6 +123,48 @@
 返回 `result.samples` 数组，每项包含 `t_min`、`utc`、`r_km`、`v_km_s`。
 采样点数量受 `limits.max_sgp4_samples` 限制。
 
+### `GET /api/norad/saved`
+
+返回 `config/user/norad_ids.txt` 中的 ID：
+
+```json
+{"ok": true, "norad_ids": [25544, 48274], "count": 2}
+```
+
+### `POST /api/norad/saved`
+
+```json
+{"norad_ids": "25544, 48274"}
+```
+
+校验并追加去重，最多保存 200 个；返回 `norad_ids`、`added`、`count`。
+
+### `POST /api/norad/saved/delete`
+
+```json
+{"norad_id": 48274}
+```
+
+从本地文件删除单个 ID；返回 `norad_ids`、`removed`、`count`。
+
+### `GET /api/f107?refresh=1`
+
+返回 NASA OMNI2 最新日 F10.7（1 AU）、81 天均值和近 183 天序列：
+
+```json
+{
+  "ok": true,
+  "source": "NASA OMNI2 (F10.7, 1 AU)",
+  "unit": "sfu",
+  "latest": {"date": "2026-11-15", "flux": 119.3, "last81": 110.0},
+  "series": [{"date": "2026-05-16", "flux": 111.5, "last81": 125.5}],
+  "range": {"start": "2026-05-16", "end": "2026-11-15", "count": 184}
+}
+```
+
+`refresh=1` 跳过 30 分钟缓存并重新拉取；数据源失败时使用上次缓存并返回
+`stale=true` 和 `warning`。
+
 ### `POST /api/celestrak`
 
 ```json

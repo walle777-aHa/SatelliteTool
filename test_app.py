@@ -225,6 +225,60 @@ class ApsSgp4ValidationTest(unittest.TestCase):
             )
 
 
+class SavedNoradTest(unittest.TestCase):
+    def test_save_and_delete_saved_norad_ids(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "norad_ids.txt"
+            with mock.patch.object(app, "SAVED_NORAD_FILE", path):
+                first = app.save_norad_ids("25544, 48274, 43013")
+                self.assertEqual(first["norad_ids"], [25544, 48274, 43013])
+                self.assertEqual(first["added"], 3)
+                second = app.save_norad_ids("48274, 43013")
+                self.assertEqual(second["added"], 0)
+                removed = app.delete_saved_norad_id(48274)
+                self.assertEqual(removed["removed"], 1)
+                self.assertEqual(removed["norad_ids"], [25544, 43013])
+                self.assertEqual(
+                    path.read_text(encoding="utf-8").splitlines(),
+                    ["25544", "43013"],
+                )
+
+
+class F107ParseTest(unittest.TestCase):
+    @staticmethod
+    def omni_line(year, day_of_year, hour, flux):
+        parts = ["0"] * 55
+        parts[0] = str(year)
+        parts[1] = str(day_of_year)
+        parts[2] = str(hour)
+        parts[50] = str(flux)
+        return " ".join(parts)
+
+    def test_parse_latest_and_half_year_series(self):
+        text = "\n".join(
+            [
+                self.omni_line(2025, 1, 0, 90.0),
+                self.omni_line(2026, 152, 0, 120.0),
+                self.omni_line(2026, 152, 1, 999.9),
+                self.omni_line(2026, 153, 0, 121.5),
+                self.omni_line(2026, 154, 0, 999.9),
+            ]
+        )
+        observations = app.parse_omni2_text(text)
+        self.assertEqual(len(observations), 3)
+        result = app.build_f107_payload(observations)
+        self.assertEqual(result["unit"], "sfu")
+        self.assertEqual(result["latest"]["date"], "2026-06-02")
+        self.assertEqual(result["latest"]["flux"], 121.5)
+        self.assertEqual(result["latest"]["last81"], 120.75)
+        self.assertEqual(result["range"]["start"], "2026-06-01")
+        self.assertEqual(len(result["series"]), 2)
+
+    def test_parse_rejects_empty_observations(self):
+        with self.assertRaises(app.ApiError):
+            app.build_f107_payload([])
+
+
 class SafeDownloadTest(unittest.TestCase):
     def test_download_stays_inside_job_directory(self):
         with tempfile.TemporaryDirectory() as temporary:

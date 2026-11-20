@@ -21,6 +21,7 @@
       <button class="nav-btn" data-page="aps">轨道转换</button>
       <button class="nav-btn" data-page="tle">TLE 递推</button>
       <button class="nav-btn" data-page="query">TLE 查询</button>
+      <button class="nav-btn" data-page="f107">F10.7</button>
     </nav>
     <div class="top-status">
       <span class="dot" id="statusDot"></span>
@@ -74,6 +75,11 @@
             <span class="shortcut-icon shortcut-query">CAT</span>
             <span class="shortcut-label">TLE 查询</span>
             <span class="shortcut-desc">Celestrak NORAD</span>
+          </button>
+          <button class="home-shortcut" data-go="f107">
+            <span class="shortcut-icon shortcut-f107">F10.7</span>
+            <span class="shortcut-label">空间环境</span>
+            <span class="shortcut-desc">太阳射电通量</span>
           </button>
         </div>
         <div class="home-hint">选择上方工具开始 · 方向键控制机器人</div>
@@ -270,16 +276,80 @@
         </div>
         <span class="hint">在线查询，最多 10 颗</span>
       </div>
-      <div class="panel">
-        <div class="panel-title">NORAD ID</div>
-        <textarea id="noradIds" rows="2" placeholder="例如：25544, 48274" required></textarea>
-        <div class="button-row">
-          <button class="btn primary" id="queryTle">查询</button>
-          <button class="btn ghost" id="copyAllTle" disabled>复制全部 TLE</button>
-          <span class="hint">支持逗号、空格或换行分隔</span>
+      <div class="query-layout">
+        <aside class="panel norad-saved-panel">
+          <div class="panel-head">
+            <div class="panel-title">已保存 NORAD ID</div>
+            <span id="noradSavedMeta" class="hint">0 个</span>
+          </div>
+          <div id="noradSavedList" class="norad-saved-list">
+            <p class="hint">暂无保存</p>
+          </div>
+        </aside>
+        <div class="query-main">
+          <div class="panel">
+            <div class="panel-title">NORAD ID</div>
+            <textarea id="noradIds" rows="2" placeholder="例如：25544, 48274" required></textarea>
+            <div class="button-row">
+              <button class="btn primary" id="queryTle">查询</button>
+              <button class="btn ghost" id="saveNorad">保存 NORAD ID</button>
+              <button class="btn ghost" id="copyAllTle" disabled>复制全部 TLE</button>
+              <span class="hint">支持逗号、空格或换行分隔</span>
+            </div>
+            <p id="queryMessage" class="hint"></p>
+          </div>
+          <div id="queryResults" class="table-wrap query-results"></div>
         </div>
       </div>
-      <div id="queryResults" class="table-wrap query-results"></div>
+    </section>
+
+    <section id="page-f107" class="page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">SPACE WEATHER</p>
+          <h2>太空环境 · F10.7</h2>
+        </div>
+        <span class="hint">NASA OMNI2 F10.7</span>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">F10.7 太阳射电通量</div>
+          <button class="btn ghost" id="f107Refresh">刷新数据</button>
+        </div>
+        <p id="f107Message" class="hint">进入页面后加载最新数据</p>
+
+        <div id="f107Cards" class="f107-cards" hidden>
+          <article class="f107-card">
+            <span>最新 F10.7</span>
+            <strong><span id="f107LatestFlux">-</span><small> sfu</small></strong>
+            <small id="f107LatestDate">-</small>
+          </article>
+          <article class="f107-card">
+            <span>81 天均值</span>
+            <strong><span id="f107Last81">-</span><small> sfu</small></strong>
+            <small>最近 81 天观测</small>
+          </article>
+          <article class="f107-card">
+            <span>半年样本</span>
+            <strong id="f107SampleCount">-</strong>
+            <small id="f107SampleRange">-</small>
+          </article>
+        </div>
+
+        <div id="f107ChartBox" class="f107-chart-box" hidden>
+          <div class="panel-head">
+            <div class="panel-title">近半年日观测曲线</div>
+            <div class="button-row compact">
+              <span id="f107ChartMeta" class="hint"></span>
+              <button class="btn ghost" id="f107Copy" disabled>复制曲线数据</button>
+            </div>
+          </div>
+          <canvas id="f107Chart" width="1200" height="340" aria-label="F10.7 近半年日观测曲线"></canvas>
+        </div>
+
+        <p id="f107Warning" class="f107-warning hidden"></p>
+        <p class="hint">数据源：NASA OMNI2（F10.7，1 AU）· 日值可能有数天滞后</p>
+      </div>
     </section>
   </main>
 

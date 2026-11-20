@@ -31,14 +31,21 @@ optional development tools; Ruff/Black currently require Python 3.10+.
 | --- | --- | --- |
 | ![APS](docs/screenshots/aps.png) | ![TLE propagation](docs/screenshots/tle.png) | ![TLE lookup](docs/screenshots/query.png) |
 
+| F10.7 space weather |
+| --- |
+| ![F10.7 space weather](docs/screenshots/f107.png) |
+
 ## Features
 
-- Solid-black home page with four shortcuts and a WALL-E-style robot that wraps
+- Solid-black home page with five shortcuts and a WALL-E-style robot that wraps
   across all four edges and can be steered with the arrow keys;
 - Simulation with configurable duration and CSV telemetry profiles;
 - APS osculating/mean element conversion with copy-mean support;
 - SGP4 TLE-to-ECEF propagation;
-- Celestrak lookup for up to 10 NORAD IDs with per-row/all copy;
+- Celestrak lookup for up to 10 NORAD IDs with per-row/all copy, plus a local
+  saved-ID list with add/delete actions;
+- NASA OMNI2 F10.7 page with latest daily value, 81-day mean, six-month chart,
+  and curve CSV copy;
 - Job history, log tail, output downloads, and history cleanup;
 - Local-only defaults, Host/Origin checks, CSP, and configurable resource limits.
 

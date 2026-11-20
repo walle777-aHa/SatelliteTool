@@ -35,7 +35,10 @@ BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config" / "tool.json"
 STATIC_DIR = BASE_DIR / "static"
 RUNS_DIR = BASE_DIR / "runs"
+SAVED_NORAD_FILE = BASE_DIR / "config" / "user" / "norad_ids.txt"
 MAX_NORAD_IDS = 10
+MAX_SAVED_NORAD_IDS = 200
+SAVED_NORAD_LOCK = threading.Lock()
 NORAD_RE = re.compile(r"^\d{1,6}$")
 NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 EPOCH_RE = re.compile(r"^\d{8}T\d{6}\.\d{4}$")
@@ -45,6 +48,10 @@ CELESTRAK_GP_JSON = "https://celestrak.org/NORAD/elements/gp.php?CATNR={id}&FORM
 CELESTRAK_SATCAT = "https://celestrak.org/satcat/records.php?CATNR={id}&FORMAT=JSON"
 CELESTRAK_CACHE: Dict[int, Tuple[float, Dict[str, Any]]] = {}
 CELESTRAK_CACHE_LOCK = threading.Lock()
+F107_SOURCE_URL = "https://spdf.gsfc.nasa.gov/pub/data/omni/low_res_omni/omni2_{year}.dat"
+F107_SOURCE_NAME = "NASA OMNI2 (F10.7, 1 AU)"
+F107_CACHE: Dict[str, Any] = {"time": 0.0, "data": None}
+F107_CACHE_LOCK = threading.Lock()
 PREVIEW_CACHE: Dict[Tuple[str, int, int, int, int, Optional[int]], Dict[str, Any]] = {}
 PREVIEW_CACHE_LOCK = threading.Lock()
 PREVIEW_CACHE_MAX = 8
@@ -867,6 +874,8 @@ class JobManager:
 def normalize_norad_ids(value: Any) -> List[int]:
     if isinstance(value, str):
         parts = re.split(r"[\s,;]+", value.strip())
+    elif isinstance(value, int):
+        parts = [str(value)]
     elif isinstance(value, (list, tuple)):
         parts = []
         for item in value:
@@ -889,6 +898,194 @@ def normalize_norad_ids(value: Any) -> List[int]:
     if len(ids) > MAX_NORAD_IDS:
         raise ApiError(400, "最多同时查询 %d 颗卫星" % MAX_NORAD_IDS)
     return ids
+
+
+def read_saved_norad_ids() -> List[int]:
+    if not SAVED_NORAD_FILE.is_file():
+        return []
+    try:
+        text = SAVED_NORAD_FILE.read_text(encoding="utf-8", errors="replace")
+    except OSError as error:
+        raise ApiError(500, "读取保存的 NORAD ID 失败: %s" % error)
+    ids: List[int] = []
+    for token in re.split(r"[\s,;]+", text):
+        if not token or not NORAD_RE.fullmatch(token):
+            continue
+        number = int(token)
+        if 1 <= number <= 999999 and number not in ids:
+            ids.append(number)
+        if len(ids) >= MAX_SAVED_NORAD_IDS:
+            break
+    return ids
+
+
+def write_saved_norad_ids(ids: List[int]) -> None:
+    SAVED_NORAD_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = SAVED_NORAD_FILE.with_name(SAVED_NORAD_FILE.name + ".tmp")
+    try:
+        temporary.write_text(
+            "".join("%d\n" % number for number in ids),
+            encoding="utf-8",
+        )
+        os.replace(temporary, SAVED_NORAD_FILE)
+    except OSError as error:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise ApiError(500, "保存 NORAD ID 失败: %s" % error)
+
+
+def save_norad_ids(value: Any) -> Dict[str, Any]:
+    incoming = normalize_norad_ids(value)
+    with SAVED_NORAD_LOCK:
+        current = read_saved_norad_ids()
+        added = [number for number in incoming if number not in current]
+        if len(current) + len(added) > MAX_SAVED_NORAD_IDS:
+            raise ApiError(400, "保存的 NORAD ID 最多 %d 个" % MAX_SAVED_NORAD_IDS)
+        combined = current + added
+        write_saved_norad_ids(combined)
+    return {"norad_ids": combined, "added": len(added), "count": len(combined)}
+
+
+def delete_saved_norad_id(value: Any) -> Dict[str, Any]:
+    ids = normalize_norad_ids(value)
+    if len(ids) != 1:
+        raise ApiError(400, "一次只能删除一个 NORAD ID")
+    target = ids[0]
+    with SAVED_NORAD_LOCK:
+        current = read_saved_norad_ids()
+        if target not in current:
+            return {"norad_ids": current, "removed": 0, "count": len(current)}
+        combined = [number for number in current if number != target]
+        write_saved_norad_ids(combined)
+    return {"norad_ids": combined, "removed": 1, "count": len(combined)}
+
+
+def parse_omni2_text(text: str) -> List[Dict[str, Any]]:
+    """Parse daily F10.7 values from a NASA OMNI2 yearly file."""
+    by_date: Dict[str, float] = {}
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) < 51:
+            continue
+        try:
+            year = int(parts[0])
+            day_of_year = int(parts[1])
+            hour = int(parts[2])
+            flux = float(parts[50])
+        except ValueError:
+            continue
+        if hour != 0 or not 0 < flux < 999:
+            continue
+        try:
+            date = (datetime(year, 1, 1) + timedelta(days=day_of_year - 1)).date()
+        except ValueError:
+            continue
+        by_date[date.isoformat()] = flux
+    return [{"date": date, "flux": by_date[date]} for date in sorted(by_date)]
+
+
+def build_f107_payload(
+    observations: List[Dict[str, Any]], window_days: int = 183
+) -> Dict[str, Any]:
+    if not observations:
+        raise ApiError(502, "F10.7 数据为空或格式不匹配")
+    dated = [
+        {
+            "date": item["date"],
+            "flux": item["flux"],
+            "date_obj": datetime.strptime(item["date"], "%Y-%m-%d"),
+        }
+        for item in sorted(observations, key=lambda item: item["date"])
+    ]
+    latest = dated[-1]
+    latest_date = latest["date_obj"]
+    cutoff = latest_date - timedelta(days=window_days)
+    series_rows = []
+    latest_last81 = None
+    for item in dated:
+        item_date = item["date_obj"]
+        window = [
+            entry
+            for entry in dated
+            if item_date - timedelta(days=80) <= entry["date_obj"] <= item_date
+        ]
+        last81 = sum(entry["flux"] for entry in window) / len(window)
+        if item_date >= cutoff:
+            series_rows.append(
+                {
+                    "date": item["date"],
+                    "flux": item["flux"],
+                    "last81": last81,
+                }
+            )
+        latest_last81 = last81
+    return {
+        "source": F107_SOURCE_NAME,
+        "source_url": F107_SOURCE_URL.format(year=latest_date.year),
+        "unit": "sfu",
+        "window_days": window_days,
+        "fetched_at": now_text(),
+        "latest": {
+            "date": latest["date"],
+            "flux": latest["flux"],
+            "last81": latest_last81,
+        },
+        "series": series_rows,
+        "range": {
+            "start": series_rows[0]["date"],
+            "end": latest["date"],
+            "count": len(series_rows),
+        },
+    }
+
+
+def fetch_f107(force: bool = False) -> Dict[str, Any]:
+    now = time.time()
+    cache_ttl = float(CONFIG.get("f107", {}).get("cache_ttl_s", 1800))
+    window_days = int(CONFIG.get("f107", {}).get("window_days", 183))
+    with F107_CACHE_LOCK:
+        cached = F107_CACHE["data"]
+        cached_at = F107_CACHE["time"]
+    if not force and cached is not None and now - cached_at < cache_ttl:
+        return cached
+
+    observations: List[Dict[str, Any]] = []
+    errors = []
+    timeout = float(CONFIG.get("f107", {}).get("timeout_s", 20))
+    current_year = datetime.now().year
+    for year in (current_year - 1, current_year):
+        try:
+            request = urllib.request.Request(
+                F107_SOURCE_URL.format(year=year),
+                headers={
+                    "User-Agent": "SatelliteTool/%s" % CONFIG.get("version", "0.2.0"),
+                    "Accept": "text/plain, */*",
+                },
+            )
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                raw = response.read(8 * 1024 * 1024)
+            observations.extend(parse_omni2_text(raw.decode("ascii", "replace")))
+        except (urllib.error.URLError, OSError, ValueError) as error:
+            errors.append("%d: %s" % (year, error))
+
+    if observations:
+        data = build_f107_payload(observations, window_days)
+        with F107_CACHE_LOCK:
+            F107_CACHE["time"] = time.time()
+            F107_CACHE["data"] = data
+        return data
+
+    message = "; ".join(errors) or "没有可用的观测数据"
+    with F107_CACHE_LOCK:
+        cached = F107_CACHE["data"]
+    if cached is not None:
+        result = dict(cached)
+        result["stale"] = True
+        result["warning"] = "F10.7 数据源暂不可用，显示上次缓存结果: " + message
+        return result
+    raise ApiError(502, "无法获取 F10.7 数据: " + message)
 
 
 def celestrak_get(url: str) -> str:
@@ -1212,6 +1409,16 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/scenarios":
                 self.send_json(200, {"ok": True, "scenarios": list_scenarios()})
                 return
+            if path == "/api/norad/saved":
+                ids = read_saved_norad_ids()
+                self.send_json(200, {"ok": True, "norad_ids": ids, "count": len(ids)})
+                return
+            if path == "/api/f107":
+                query = urllib.parse.parse_qs(parsed.query)
+                force = query.get("refresh", ["0"])[0].lower() in ("1", "true", "yes")
+                data = fetch_f107(force=force)
+                self.send_json(200, {"ok": True, **data})
+                return
             match = re.fullmatch(r"/api/jobs/([A-Za-z0-9_.-]+)/file", path)
             if match:
                 query = urllib.parse.parse_qs(parsed.query)
@@ -1246,6 +1453,15 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/celestrak":
                 self.send_json(200, fetch_celestrak_batch(body))
+                return
+            if path == "/api/norad/saved":
+                self.send_json(200, {"ok": True, **save_norad_ids(body.get("norad_ids", ""))})
+                return
+            if path == "/api/norad/saved/delete":
+                self.send_json(
+                    200,
+                    {"ok": True, **delete_saved_norad_id(body.get("norad_id", ""))},
+                )
                 return
             match = re.fullmatch(r"/api/jobs/([A-Za-z0-9_.-]+)/stop", path)
             if match:

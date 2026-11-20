@@ -8,6 +8,9 @@
     chartRows: [],
     chartColumns: [],
     tleResults: [],
+    savedNoradIds: [],
+    f107: null,
+    f107Loading: false,
     pollFailures: 0,
   };
 
@@ -82,6 +85,14 @@
       section.classList.toggle("active", section.id === "page-" + page);
     });
     if (page === "sim") loadJobs();
+    if (page === "query") loadSavedNoradIds();
+    if (page === "f107") {
+      if (!state.f107 && !state.f107Loading) {
+        loadF107();
+      } else if (state.f107) {
+        window.requestAnimationFrame(drawF107Chart);
+      }
+    }
     if (updateHash && window.location.hash !== "#" + page) {
       window.location.hash = page;
     }
@@ -89,7 +100,9 @@
 
   function pageFromHash() {
     const page = (window.location.hash || "#home").replace("#", "");
-    return ["home", "sim", "aps", "tle", "query"].includes(page) ? page : "home";
+    return ["home", "sim", "aps", "tle", "query", "f107"].includes(page)
+      ? page
+      : "home";
   }
 
   async function loadInfo() {
@@ -486,6 +499,246 @@
     return value.toFixed(3);
   }
 
+  function formatF107Value(value) {
+    return typeof value === "number" && Number.isFinite(value)
+      ? value.toFixed(1)
+      : "-";
+  }
+
+  async function loadF107(force = false) {
+    if (state.f107Loading) return;
+    state.f107Loading = true;
+    const button = $("#f107Refresh");
+    const message = $("#f107Message");
+    button.disabled = true;
+    message.className = "hint";
+    message.textContent = force ? "正在刷新 F10.7 数据..." : "正在加载 F10.7 数据...";
+    try {
+      const data = await api("/api/f107" + (force ? "?refresh=1" : ""), {
+        timeoutMs: 30000,
+      });
+      state.f107 = data;
+      renderF107(data);
+      message.className = data.stale ? "hint f107-warning" : "hint";
+      message.textContent = data.stale
+        ? "数据源暂不可用，显示缓存结果"
+        : "数据已更新";
+    } catch (error) {
+      message.className = "hint error-text";
+      message.textContent = error.message;
+    } finally {
+      state.f107Loading = false;
+      button.disabled = false;
+    }
+  }
+
+  function renderF107(data) {
+    const latest = data.latest || {};
+    const range = data.range || {};
+    $("#f107LatestFlux").textContent = formatF107Value(latest.flux);
+    $("#f107LatestDate").textContent = latest.date
+      ? "观测日期 " + latest.date + " · 1 AU"
+      : "-";
+    $("#f107Last81").textContent = formatF107Value(latest.last81);
+    $("#f107SampleCount").textContent = (range.count || 0) + " 天";
+    $("#f107SampleRange").textContent =
+      (range.start || "-") + " → " + (range.end || "-");
+    $("#f107ChartMeta").textContent =
+      (range.start || "-") +
+      " – " +
+      (range.end || "-") +
+      " · " +
+      (range.count || 0) +
+      " 个日观测";
+    $("#f107Cards").hidden = false;
+    $("#f107ChartBox").hidden = false;
+    $("#f107Copy").disabled = !(data.series && data.series.length);
+    const warning = $("#f107Warning");
+    warning.textContent = data.warning || "";
+    warning.hidden = !data.warning;
+    window.requestAnimationFrame(drawF107Chart);
+  }
+
+  function drawF107Chart() {
+    const canvas = $("#f107Chart");
+    const data = state.f107;
+    if (!canvas || !data) return;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (width < 2 || height < 2) return;
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(width * ratio));
+    canvas.height = Math.max(1, Math.floor(height * ratio));
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const rows = (data.series || []).filter(
+      (item) => typeof item.flux === "number" && Number.isFinite(item.flux)
+    );
+    if (rows.length < 2) {
+      ctx.fillStyle = "#8e9aa8";
+      ctx.font = "13px Consolas, monospace";
+      ctx.fillText("F10.7 日观测数据不足", 20, 30);
+      return;
+    }
+
+    const padding = { left: 56, right: 24, top: 38, bottom: 38 };
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+    const values = [];
+    rows.forEach((item) => {
+      values.push(item.flux);
+      if (typeof item.last81 === "number" && Number.isFinite(item.last81)) {
+        values.push(item.last81);
+      }
+    });
+    let minY = Math.min(...values);
+    let maxY = Math.max(...values);
+    if (minY === maxY) {
+      minY -= 1;
+      maxY += 1;
+    }
+    const yPadding = Math.max(5, (maxY - minY) * 0.12);
+    minY -= yPadding;
+    maxY += yPadding;
+    const mapX = (index) =>
+      padding.left + (index / (rows.length - 1)) * plotWidth;
+    const mapY = (value) =>
+      padding.top + (1 - (value - minY) / (maxY - minY)) * plotHeight;
+
+    ctx.strokeStyle = "#2a313b";
+    ctx.fillStyle = "#8e9aa8";
+    ctx.font = "11px Consolas, monospace";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i += 1) {
+      const y = padding.top + (plotHeight * i) / 4;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(width - padding.right, y);
+      ctx.stroke();
+      const value = maxY - ((maxY - minY) * i) / 4;
+      ctx.fillText(value.toFixed(0), 8, y + 4);
+    }
+    for (let i = 0; i <= 4; i += 1) {
+      const x = padding.left + (plotWidth * i) / 4;
+      ctx.beginPath();
+      ctx.moveTo(x, padding.top);
+      ctx.lineTo(x, height - padding.bottom);
+      ctx.stroke();
+      const index = Math.round(((rows.length - 1) * i) / 4);
+      ctx.fillText(rows[index].date.slice(5), x - 18, height - padding.bottom + 20);
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(padding.left, padding.top, plotWidth, plotHeight);
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(mapX(0), padding.top + plotHeight);
+    rows.forEach((item, index) => {
+      ctx.lineTo(mapX(index), mapY(item.flux));
+    });
+    ctx.lineTo(mapX(rows.length - 1), padding.top + plotHeight);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(77, 212, 198, 0.08)";
+    ctx.fill();
+
+    ctx.strokeStyle = "#4dd4c6";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    rows.forEach((item, index) => {
+      const x = mapX(index);
+      const y = mapY(item.flux);
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    const meanPoints = [];
+    rows.forEach((item, index) => {
+      if (typeof item.last81 === "number" && Number.isFinite(item.last81)) {
+        meanPoints.push({ x: mapX(index), y: mapY(item.last81) });
+      }
+    });
+    if (meanPoints.length >= 2) {
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = "#f4b860";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      meanPoints.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    const latest = rows[rows.length - 1];
+    ctx.fillStyle = "#4dd4c6";
+    ctx.beginPath();
+    ctx.arc(mapX(rows.length - 1), mapY(latest.flux), 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.font = "12px Segoe UI, sans-serif";
+    ctx.fillStyle = "#4dd4c6";
+    ctx.fillRect(padding.left, 12, 14, 3);
+    ctx.fillText("F10.7 日值", padding.left + 20, 18);
+    ctx.fillStyle = "#f4b860";
+    ctx.fillRect(padding.left + 122, 12, 14, 3);
+    ctx.fillText("81 天均值", padding.left + 142, 18);
+
+    const lastX = mapX(rows.length - 1);
+    ctx.fillStyle = "#e7edf5";
+    ctx.font = "11px Consolas, monospace";
+    const label = formatF107Value(latest.flux);
+    ctx.fillText(
+      label,
+      lastX > width - 70 ? lastX - 42 : lastX + 8,
+      mapY(latest.flux) - 9
+    );
+    canvas.setAttribute(
+      "aria-label",
+      "F10.7 近半年曲线：" +
+        (data.range?.start || "-") +
+        " 至 " +
+        (data.range?.end || "-") +
+        "，最新 " +
+        label +
+        " sfu"
+    );
+  }
+
+  function f107SeriesCsv() {
+    const series = (state.f107 && state.f107.series) || [];
+    const lines = ["date,F10.7_sfu,F10.7_81d_mean_sfu"];
+    series.forEach((item) => {
+      const values = [item.date || "", item.flux, item.last81].map((value) =>
+        typeof value === "number" && Number.isFinite(value)
+          ? value.toFixed(1)
+          : String(value || "")
+      );
+      lines.push(values.join(","));
+    });
+    return lines.join("\n");
+  }
+
+  async function copyF107Series() {
+    if (!state.f107) return;
+    const message = $("#f107Message");
+    const ok = await copyText(
+      f107SeriesCsv(),
+      "已复制近半年 F10.7 曲线数据"
+    );
+    message.className = ok ? "hint" : "hint error-text";
+    message.textContent = ok
+      ? "近半年曲线数据已复制（" + (state.f107.series || []).length + " 行）"
+      : "复制失败";
+  }
+
   async function runSimulation() {
     stopPolling();
     const body = {
@@ -568,6 +821,7 @@
     try {
       await navigator.clipboard.writeText(content);
       toast(message || "已复制");
+      return true;
     } catch (error) {
       const area = document.createElement("textarea");
       area.value = content;
@@ -578,8 +832,10 @@
       try {
         if (!document.execCommand("copy")) throw new Error("copy failed");
         toast(message || "已复制");
+        return true;
       } catch (fallbackError) {
         toast("复制失败", true);
+        return false;
       } finally {
         area.remove();
       }
@@ -666,6 +922,118 @@
       toast(error.message, true);
     } finally {
       submit.disabled = false;
+    }
+  }
+
+  function renderSavedNoradIds(ids) {
+    const list = $("#noradSavedList");
+    list.innerHTML = "";
+    $("#noradSavedMeta").textContent = ids.length + " 个";
+    if (!ids.length) {
+      list.innerHTML = '<p class="hint">暂无保存</p>';
+      return;
+    }
+    ids.forEach((id) => {
+      const item = document.createElement("div");
+      item.className = "norad-saved-item";
+      const value = document.createElement("span");
+      value.className = "norad-saved-id";
+      value.textContent = id;
+      const actions = document.createElement("div");
+      actions.className = "norad-saved-actions";
+      const add = document.createElement("button");
+      add.className = "btn ghost";
+      add.type = "button";
+      add.textContent = "添加";
+      add.addEventListener("click", () => appendSavedNoradId(id));
+      const remove = document.createElement("button");
+      remove.className = "btn ghost danger";
+      remove.type = "button";
+      remove.textContent = "删除";
+      remove.title = "从保存列表和本地文件删除";
+      remove.addEventListener("click", () => deleteSavedNoradId(id));
+      actions.appendChild(add);
+      actions.appendChild(remove);
+      item.appendChild(value);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+  }
+
+  async function loadSavedNoradIds() {
+    try {
+      const data = await api("/api/norad/saved");
+      state.savedNoradIds = data.norad_ids || [];
+      renderSavedNoradIds(state.savedNoradIds);
+    } catch (error) {
+      $("#noradSavedMeta").textContent = "加载失败";
+      const message = $("#queryMessage");
+      message.className = "hint error-text";
+      message.textContent = "保存列表加载失败：" + error.message;
+    }
+  }
+
+  function appendSavedNoradId(id) {
+    const input = $("#noradIds");
+    const message = $("#queryMessage");
+    const current = input.value.split(/[\s,;]+/).filter(Boolean);
+    if (current.includes(String(id))) {
+      message.className = "hint";
+      message.textContent = "NORAD " + id + " 已在查询栏";
+      return;
+    }
+    if (current.length >= 10) {
+      message.className = "hint error-text";
+      message.textContent = "查询栏最多 10 个 NORAD ID";
+      return;
+    }
+    input.value = input.value.trim()
+      ? input.value.trim().replace(/[\s,;]+$/, "") + ", " + id
+      : String(id);
+    input.focus();
+    message.className = "hint";
+    message.textContent = "已添加 NORAD " + id;
+  }
+
+  async function saveNoradIds() {
+    const message = $("#queryMessage");
+    const button = $("#saveNorad");
+    button.disabled = true;
+    try {
+      const data = await api("/api/norad/saved", {
+        method: "POST",
+        body: { norad_ids: $("#noradIds").value },
+      });
+      state.savedNoradIds = data.norad_ids || [];
+      renderSavedNoradIds(state.savedNoradIds);
+      message.className = "hint";
+      message.textContent = data.added
+        ? "已保存 " + data.added + " 个 NORAD ID"
+        : "这些 NORAD ID 已在保存列表中";
+    } catch (error) {
+      message.className = "hint error-text";
+      message.textContent = "保存失败：" + error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function deleteSavedNoradId(id) {
+    const message = $("#queryMessage");
+    try {
+      const data = await api("/api/norad/saved/delete", {
+        method: "POST",
+        body: { norad_id: id },
+      });
+      state.savedNoradIds = data.norad_ids || [];
+      renderSavedNoradIds(state.savedNoradIds);
+      message.className = data.removed ? "hint" : "hint";
+      message.textContent = data.removed
+        ? "已删除 NORAD " + id
+        : "NORAD " + id + " 不在保存列表中";
+    } catch (error) {
+      message.className = "hint error-text";
+      message.textContent = "删除失败：" + error.message;
     }
   }
 
@@ -967,14 +1335,22 @@
     });
     $("#tleForm").addEventListener("submit", submitTle);
     $("#queryTle").addEventListener("click", queryTle);
+    $("#saveNorad").addEventListener("click", saveNoradIds);
     $("#copyAllTle").addEventListener("click", copyAllTle);
+    $("#f107Refresh").addEventListener("click", () => loadF107(true));
+    $("#f107Copy").addEventListener("click", copyF107Series);
     labelApsResultInputs();
     window.addEventListener("hashchange", () => {
       const page = pageFromHash();
       const active = $(".page.active");
       if (active?.id !== "page-" + page) switchPage(page, false);
     });
-    window.addEventListener("resize", drawChart);
+    window.addEventListener("resize", () => {
+      drawChart();
+      if ($("#page-f107").classList.contains("active") && state.f107) {
+        drawF107Chart();
+      }
+    });
   }
 
   async function boot() {

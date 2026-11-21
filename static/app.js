@@ -925,20 +925,55 @@
     }
   }
 
-  function renderSavedNoradIds(ids) {
-    const list = $("#noradSavedList");
-    list.innerHTML = "";
-    $("#noradSavedMeta").textContent = ids.length + " 个";
+  function savedNoradGroups(data) {
+    const ids = Array.isArray(data) ? data : (data && data.norad_ids) || [];
+    const groups = (data && data.groups) || {};
+    const hasGroups =
+      Array.isArray(groups.china) ||
+      Array.isArray(groups.foreign) ||
+      Array.isArray(groups.unknown);
+    return {
+      ids,
+      china: Array.isArray(groups.china) ? groups.china : [],
+      foreign: Array.isArray(groups.foreign)
+        ? groups.foreign
+        : hasGroups
+        ? []
+        : ids,
+      unknown: Array.isArray(groups.unknown) ? groups.unknown : [],
+      states: (data && data.states) || {},
+      classification: (data && data.classification) || {},
+    };
+  }
+
+  function renderSavedNoradGroup(container, ids, states, unknownIds) {
+    container.textContent = "";
     if (!ids.length) {
-      list.innerHTML = '<p class="hint">暂无保存</p>';
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "暂无";
+      container.appendChild(empty);
       return;
     }
     ids.forEach((id) => {
+      const isUnknown = unknownIds.has(Number(id));
       const item = document.createElement("div");
       item.className = "norad-saved-item";
+      const info = document.createElement("div");
+      info.className = "norad-saved-info";
       const value = document.createElement("span");
       value.className = "norad-saved-id";
       value.textContent = id;
+      const country = document.createElement("span");
+      country.className = isUnknown
+        ? "norad-saved-state unknown"
+        : "norad-saved-state";
+      country.textContent = isUnknown ? "未分类" : states[String(id)] || "—";
+      country.title = isUnknown
+        ? "GCAT 目录中未找到该 NORAD ID"
+        : "GCAT State: " + (states[String(id)] || "未知");
+      info.appendChild(value);
+      info.appendChild(country);
       const actions = document.createElement("div");
       actions.className = "norad-saved-actions";
       const add = document.createElement("button");
@@ -954,17 +989,53 @@
       remove.addEventListener("click", () => deleteSavedNoradId(id));
       actions.appendChild(add);
       actions.appendChild(remove);
-      item.appendChild(value);
+      item.appendChild(info);
       item.appendChild(actions);
-      list.appendChild(item);
+      container.appendChild(item);
     });
   }
 
+  function renderSavedNoradIds(data) {
+    const groups = savedNoradGroups(data);
+    const unknownIds = new Set(groups.unknown.map(Number));
+    $("#noradSavedMeta").textContent = groups.ids.length + " 个";
+    $("#noradSavedChinaCount").textContent = groups.china.length;
+    $("#noradSavedForeignCount").textContent =
+      groups.foreign.length + groups.unknown.length;
+    renderSavedNoradGroup(
+      $("#noradSavedChina"),
+      groups.china,
+      groups.states,
+      unknownIds
+    );
+    renderSavedNoradGroup(
+      $("#noradSavedForeign"),
+      groups.foreign.concat(groups.unknown),
+      groups.states,
+      unknownIds
+    );
+
+    const note = $("#noradSavedNote");
+    if (groups.classification.warning) {
+      note.className = "hint norad-saved-note warning";
+      note.textContent = groups.classification.warning;
+    } else if (groups.unknown.length) {
+      note.className = "hint norad-saved-note warning";
+      note.textContent =
+        groups.unknown.length +
+        " 个 ID 未匹配 GCAT 国家信息，已归入国外列";
+    } else {
+      note.className = "hint norad-saved-note";
+      note.textContent = "国家分类：GCAT State（CN 为中国）";
+    }
+  }
+
   async function loadSavedNoradIds() {
+    $("#noradSavedMeta").textContent = "加载中...";
     try {
       const data = await api("/api/norad/saved");
       state.savedNoradIds = data.norad_ids || [];
-      renderSavedNoradIds(state.savedNoradIds);
+      renderSavedNoradIds(data);
     } catch (error) {
       $("#noradSavedMeta").textContent = "加载失败";
       const message = $("#queryMessage");
@@ -1005,7 +1076,7 @@
         body: { norad_ids: $("#noradIds").value },
       });
       state.savedNoradIds = data.norad_ids || [];
-      renderSavedNoradIds(state.savedNoradIds);
+      renderSavedNoradIds(data);
       message.className = "hint";
       message.textContent = data.added
         ? "已保存 " + data.added + " 个 NORAD ID"
@@ -1026,7 +1097,7 @@
         body: { norad_id: id },
       });
       state.savedNoradIds = data.norad_ids || [];
-      renderSavedNoradIds(state.savedNoradIds);
+      renderSavedNoradIds(data);
       message.className = data.removed ? "hint" : "hint";
       message.textContent = data.removed
         ? "已删除 NORAD " + id

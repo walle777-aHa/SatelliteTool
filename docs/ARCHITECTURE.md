@@ -42,7 +42,9 @@ app.py（标准库 ThreadingHTTPServer）
 6. APS/SGP4：同步调用对应 exe，读取 stdout JSON 返回浏览器；
 7. TLE 查询：并发访问 Celestrak，结果按 NORAD ID 缓存；
 8. F10.7：读取 NASA OMNI2 当前年和上一年文件，计算日值和 81 天均值，缓存 30 分钟；
-9. NORAD 保存：读写 `config/user/norad_ids.txt`，支持追加和单条删除。
+9. NORAD 保存：读写 `config/user/norad_ids.txt`，支持追加和单条删除；
+10. NORAD 国家分组：读取 GCAT `satcat.tsv` 的 `State`，按已保存 ID 缓存到
+    `config/user/norad_countries.json`；未匹配 ID 归入国外列。
 
 ## 任务生命周期
 
@@ -61,6 +63,8 @@ app.py（标准库 ThreadingHTTPServer）
 - 响应带 CSP、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`；
 - 任务 ID、下载路径、场景名、CSV 配置名和 NORAD ID 均做白名单/越界校验；
 - NORAD 保存文件固定为 `config/user/norad_ids.txt`，不接受外部路径；
+- 国家分类固定访问 GCAT `satcat.tsv`，缓存固定为
+  `config/user/norad_countries.json`；
 - 非本机监听必须显式 `--allow-remote`，当前版本没有鉴权，不建议公网使用。
 
 ## 资源限制
@@ -77,7 +81,7 @@ app.py（标准库 ThreadingHTTPServer）
 | --- | --- |
 | `bin/` | 编译好的 exe 和 DLL |
 | `config/` | 工具配置和 CSV 配置 |
-| `config/user/` | 本地保存的 NORAD ID（git 忽略） |
+| `config/user/` | 本地保存的 NORAD ID 与国家分类缓存（git 忽略） |
 | `runtime/cfg/` | BlueSpace 分层配置 |
 | `runtime/data/` | EOP、重力场、磁场等数据 |
 | `static/` | 前端页面、样式、脚本、favicon |

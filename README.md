@@ -57,7 +57,8 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
 - **轨道转换**：调用 `ApsOrbitTool.exe`，结果按输入表单展示，支持一键复制平根；
 - **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度；
 - **TLE 查询**：Celestrak 查询最多 10 个 NORAD ID，结果按行展示，支持单行/全部
-  复制；左侧保存列表支持保存、添加和删除本地 NORAD ID；
+  复制；左侧保存列表支持保存、添加和删除本地 NORAD ID，并按 GCAT 国家代码
+  分为中国/国外两列；
 - **F10.7 空间环境**：NASA OMNI2 最新日值、81 天均值和近 183 天曲线，
   支持复制曲线 CSV；
 - **CSV 定制**：按 JSON 配置选择列、重命名、缩放、偏移和精度；
@@ -73,7 +74,7 @@ SatelliteTool/
 ├── config/
 │   ├── tool.json              # exe 路径、运行目录、限制、历史策略
 │   ├── telemetry/             # CSV 输出配置
-│   └── user/                  # 本地保存的 NORAD ID（git 忽略）
+│   └── user/                  # 本地 NORAD ID 与国家分类缓存（git 忽略）
 ├── bin/                       # BlueSpace/APS/SGP4 exe、DLL、SHA256SUMS
 ├── runtime/
 │   ├── cfg/                   # BlueSpace 分层配置
@@ -191,6 +192,11 @@ SatelliteTool/
 左侧“已保存 NORAD ID”读取 `config/user/norad_ids.txt`；保存按钮把当前查询栏
 中的 ID 追加到本地文件，列表中的“添加”写入查询栏，“删除”同时从列表和文件移除。
 
+保存列表按 GCAT `satcat.tsv` 的 `State` 字段分为“中国”和“国外”两列：
+`CN` 为中国，其他已识别国家显示国家代码，未匹配的 ID 归入国外列并标注
+“未分类”。分类结果缓存在 `config/user/norad_countries.json`，只有遇到新 ID
+时才批量下载 GCAT 目录；数据源不可用时列表仍正常显示。
+
 ### F10.7 空间环境
 
 展示 NASA OMNI2 的最新日 F10.7（1 AU 调整值）、81 天均值和近 183 天变化曲线；
@@ -208,7 +214,7 @@ SatelliteTool/
 | GET | `/api/jobs/<id>?limit=N` | 任务详情与 CSV 预览 |
 | GET | `/api/jobs/<id>/log?tail=N` | 日志尾部 |
 | GET | `/api/jobs/<id>/file?name=...` | 下载产物 |
-| GET | `/api/norad/saved` | 读取已保存的 NORAD ID |
+| GET | `/api/norad/saved` | 读取已保存的 NORAD ID 及中国/国外分组 |
 | GET | `/api/f107?refresh=1` | F10.7 最新值与近半年序列 |
 | POST | `/api/run` | `{scenario, simulation_time?, csv_profile}` |
 | POST | `/api/norad/saved` | 保存 `{norad_ids}`（追加去重） |
@@ -248,8 +254,8 @@ python -m black --check .
 node --check static/app.js
 ```
 
-当前测试 21 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
-Host/Origin、Content-Type、任务清理、NORAD 保存/删除和 F10.7 解析。
+当前测试 25 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
+Host/Origin、Content-Type、任务清理、NORAD 保存/删除、国家分组和 F10.7 解析。
 
 `app.py` 运行时只使用 Python 标准库，支持 Python 3.9+。Ruff/Black 开发工具
 当前要求 Python 3.10+；CI 在 Python 3.12 上执行 lint，在 3.9–3.13 上执行测试。

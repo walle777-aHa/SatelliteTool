@@ -125,11 +125,31 @@
 
 ### `GET /api/norad/saved`
 
-返回 `config/user/norad_ids.txt` 中的 ID：
+返回 `config/user/norad_ids.txt` 中的 ID 及国家分组：
 
 ```json
-{"ok": true, "norad_ids": [25544, 48274], "count": 2}
+{
+  "ok": true,
+  "norad_ids": [65106, 25544, 99999],
+  "count": 3,
+  "groups": {
+    "china": [65106],
+    "foreign": [25544],
+    "unknown": [99999]
+  },
+  "states": {"65106": "CN", "25544": "US"},
+  "classification": {
+    "source": "GCAT satcat.tsv",
+    "source_url": "https://planet4589.org/space/gcat/tsv/cat/satcat.tsv",
+    "updated_at": "2026-11-21 08:05:22"
+  }
+}
 ```
+
+`groups.china` 为 `State=CN` 的 ID；`groups.foreign` 为其他已识别国家；
+`groups.unknown` 为 GCAT 未匹配的 ID，页面将其归入国外列并标注“未分类”。
+分类缓存在 `config/user/norad_countries.json`，数据源失败时
+`classification.warning` 会说明原因。
 
 ### `POST /api/norad/saved`
 
@@ -137,7 +157,8 @@
 {"norad_ids": "25544, 48274"}
 ```
 
-校验并追加去重，最多保存 200 个；返回 `norad_ids`、`added`、`count`。
+校验并追加去重，最多保存 200 个；返回 `norad_ids`、`added`、`count`，
+以及上述 `groups`、`states`、`classification` 字段。
 
 ### `POST /api/norad/saved/delete`
 
@@ -145,7 +166,7 @@
 {"norad_id": 48274}
 ```
 
-从本地文件删除单个 ID；返回 `norad_ids`、`removed`、`count`。
+从本地文件删除单个 ID；返回 `norad_ids`、`removed`、`count`，以及上述分组字段。
 
 ### `GET /api/f107?refresh=1`
 

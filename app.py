@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import csv
+import http.client
 import json
 import math
 import mimetypes
@@ -52,6 +53,14 @@ F107_SOURCE_URL = "https://spdf.gsfc.nasa.gov/pub/data/omni/low_res_omni/omni2_{
 F107_SOURCE_NAME = "NASA OMNI2 (F10.7, 1 AU)"
 F107_CACHE: Dict[str, Any] = {"time": 0.0, "data": None}
 F107_CACHE_LOCK = threading.Lock()
+GCAT_SATCAT_URL = "https://planet4589.org/space/gcat/tsv/cat/satcat.tsv"
+GCAT_CACHE_FILE = BASE_DIR / "config" / "user" / "norad_countries.json"
+GCAT_TIMEOUT = 30
+GCAT_MAX_BYTES = 32 * 1024 * 1024
+GCAT_RETRY_SECONDS = 300
+GCAT_UNKNOWN_TTL = 7 * 24 * 3600
+GCAT_LOCK = threading.Lock()
+GCAT_LAST_FAILURE = {"time": 0.0}
 PREVIEW_CACHE: Dict[Tuple[str, int, int, int, int, Optional[int]], Dict[str, Any]] = {}
 PREVIEW_CACHE_LOCK = threading.Lock()
 PREVIEW_CACHE_MAX = 8
@@ -962,6 +971,204 @@ def delete_saved_norad_id(value: Any) -> Dict[str, Any]:
     return {"norad_ids": combined, "removed": 1, "count": len(combined)}
 
 
+def parse_gcat_states(text: str, wanted: Optional[List[int]] = None) -> Dict[str, str]:
+    """Extract Satcat -> State pairs from the GCAT satcat.tsv catalog."""
+    wanted_keys = None if wanted is None else {str(number) for number in wanted}
+    states: Dict[str, str] = {}
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) <= 15:
+            continue
+        satcat = parts[1].strip()
+        state = parts[15].strip().upper()
+        if not satcat.isdigit() or not state or state == "-":
+            continue
+        if wanted_keys is not None and satcat not in wanted_keys:
+            continue
+        states[satcat] = state
+    return states
+
+
+def read_norad_country_cache() -> Dict[str, Any]:
+    cache: Dict[str, Any] = {
+        "states": {},
+        "unknown": [],
+        "updated_at": None,
+        "checked_at": 0.0,
+    }
+    if not GCAT_CACHE_FILE.is_file():
+        return cache
+    try:
+        raw = json.loads(GCAT_CACHE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return cache
+    if not isinstance(raw, dict):
+        return cache
+    states = raw.get("states")
+    if isinstance(states, dict):
+        for key, value in states.items():
+            key = str(key)
+            if key.isdigit() and isinstance(value, str) and value.strip():
+                cache["states"][key] = value.strip().upper()
+    unknown = raw.get("unknown")
+    if isinstance(unknown, list):
+        for item in unknown:
+            item = str(item)
+            if item.isdigit() and item not in cache["unknown"]:
+                cache["unknown"].append(item)
+    updated_at = raw.get("updated_at")
+    if isinstance(updated_at, str):
+        cache["updated_at"] = updated_at
+    checked_at = raw.get("checked_at")
+    if isinstance(checked_at, (int, float)) and math.isfinite(checked_at) and checked_at > 0:
+        cache["checked_at"] = float(checked_at)
+    return cache
+
+
+def write_norad_country_cache(states: Dict[str, str], unknown: set) -> Dict[str, Any]:
+    GCAT_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = GCAT_CACHE_FILE.with_name(GCAT_CACHE_FILE.name + ".tmp")
+    payload: Dict[str, Any] = {
+        "source": GCAT_SATCAT_URL,
+        "updated_at": now_text(),
+        "checked_at": time.time(),
+        "states": states,
+        "unknown": sorted(unknown, key=int),
+    }
+    try:
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, GCAT_CACHE_FILE)
+    except OSError:
+        try:
+            temporary.unlink()
+        except OSError:
+            pass
+        raise
+    return payload
+
+
+def fetch_gcat_states(wanted: List[str]) -> Dict[str, str]:
+    request = urllib.request.Request(
+        GCAT_SATCAT_URL,
+        headers={
+            "User-Agent": "SatelliteTool/%s" % CONFIG.get("version", "0.2.0"),
+            "Accept": "text/tab-separated-values, text/plain, */*",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=GCAT_TIMEOUT) as response:
+        raw = response.read(GCAT_MAX_BYTES + 1)
+    if len(raw) > GCAT_MAX_BYTES:
+        raise ValueError("GCAT 目录超过大小限制")
+    return parse_gcat_states(raw.decode("utf-8", "replace"), wanted)
+
+
+def resolve_norad_countries(
+    ids: List[int],
+) -> Tuple[Dict[str, str], set, Optional[str], Optional[str]]:
+    cache = read_norad_country_cache()
+    states = dict(cache["states"])
+    unknown = set(cache["unknown"])
+    checked_at = cache["checked_at"]
+    updated_at = cache["updated_at"]
+    now = time.time()
+    pending: List[str] = []
+    for number in ids:
+        key = str(number)
+        if key in states:
+            continue
+        if key in unknown and now - checked_at < GCAT_UNKNOWN_TTL:
+            continue
+        pending.append(key)
+
+    warning = None
+    if pending:
+        with GCAT_LOCK:
+            cache = read_norad_country_cache()
+            states = dict(cache["states"])
+            unknown = set(cache["unknown"])
+            checked_at = cache["checked_at"]
+            updated_at = cache["updated_at"]
+            now = time.time()
+            pending = []
+            for number in ids:
+                key = str(number)
+                if key in states:
+                    continue
+                if key in unknown and now - checked_at < GCAT_UNKNOWN_TTL:
+                    continue
+                pending.append(key)
+
+            if pending and now - GCAT_LAST_FAILURE["time"] >= GCAT_RETRY_SECONDS:
+                try:
+                    fetched = fetch_gcat_states(pending)
+                except (
+                    urllib.error.URLError,
+                    http.client.HTTPException,
+                    OSError,
+                    ValueError,
+                ) as error:
+                    GCAT_LAST_FAILURE["time"] = time.time()
+                    warning = "国家分类数据暂不可用：%s" % error
+                else:
+                    for key in pending:
+                        state = fetched.get(key)
+                        if state:
+                            states[key] = state
+                            unknown.discard(key)
+                        else:
+                            unknown.add(key)
+                    try:
+                        payload = write_norad_country_cache(states, unknown)
+                        updated_at = payload["updated_at"]
+                    except OSError as error:
+                        warning = "国家分类缓存写入失败：%s" % error
+                    GCAT_LAST_FAILURE["time"] = 0.0
+            elif pending:
+                warning = "国家分类数据暂不可用，未匹配的 ID 暂归入国外列"
+
+    return states, unknown, updated_at, warning
+
+
+def group_norad_ids_by_country(ids: List[int], states: Dict[str, str]) -> Dict[str, List[int]]:
+    groups: Dict[str, List[int]] = {"china": [], "foreign": [], "unknown": []}
+    for number in ids:
+        state = states.get(str(number))
+        if state == "CN":
+            groups["china"].append(number)
+        elif state:
+            groups["foreign"].append(number)
+        else:
+            groups["unknown"].append(number)
+    return groups
+
+
+def norad_group_payload(ids: List[int]) -> Dict[str, Any]:
+    states, _unknown, updated_at, warning = resolve_norad_countries(ids)
+    payload: Dict[str, Any] = {
+        "groups": group_norad_ids_by_country(ids, states),
+        "states": {str(number): states[str(number)] for number in ids if str(number) in states},
+        "classification": {
+            "source": "GCAT satcat.tsv",
+            "source_url": GCAT_SATCAT_URL,
+            "updated_at": updated_at,
+        },
+    }
+    if warning:
+        payload["classification"]["warning"] = warning
+    return payload
+
+
+def saved_norad_response(payload: Dict[str, Any]) -> Dict[str, Any]:
+    result = dict(payload)
+    result.update(norad_group_payload(payload.get("norad_ids", [])))
+    return result
+
+
 def parse_omni2_text(text: str) -> List[Dict[str, Any]]:
     """Parse daily F10.7 values from a NASA OMNI2 yearly file."""
     by_date: Dict[str, float] = {}
@@ -1411,7 +1618,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/norad/saved":
                 ids = read_saved_norad_ids()
-                self.send_json(200, {"ok": True, "norad_ids": ids, "count": len(ids)})
+                self.send_json(
+                    200,
+                    {
+                        "ok": True,
+                        **saved_norad_response({"norad_ids": ids, "count": len(ids)}),
+                    },
+                )
                 return
             if path == "/api/f107":
                 query = urllib.parse.parse_qs(parsed.query)
@@ -1455,12 +1668,21 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, fetch_celestrak_batch(body))
                 return
             if path == "/api/norad/saved":
-                self.send_json(200, {"ok": True, **save_norad_ids(body.get("norad_ids", ""))})
+                self.send_json(
+                    200,
+                    {
+                        "ok": True,
+                        **saved_norad_response(save_norad_ids(body.get("norad_ids", ""))),
+                    },
+                )
                 return
             if path == "/api/norad/saved/delete":
                 self.send_json(
                     200,
-                    {"ok": True, **delete_saved_norad_id(body.get("norad_id", ""))},
+                    {
+                        "ok": True,
+                        **saved_norad_response(delete_saved_norad_id(body.get("norad_id", ""))),
+                    },
                 )
                 return
             match = re.fullmatch(r"/api/jobs/([A-Za-z0-9_.-]+)/stop", path)

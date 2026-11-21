@@ -8,9 +8,11 @@
   支持复制曲线 CSV；
 - TLE 查询页 NORAD ID 本地保存：`config/user/norad_ids.txt`，
   左侧列表支持添加和删除；
+- 已保存 NORAD ID 按 GCAT 国家代码分为中国/国外两列，分类缓存到
+  `config/user/norad_countries.json`，未匹配项标注“未分类”；
 - 新增 API：`GET /api/f107`、`GET/POST /api/norad/saved`、
-  `POST /api/norad/saved/delete`；
-- 单元测试扩展到 21 项，覆盖 NORAD 保存/删除和 F10.7 解析。
+  `POST /api/norad/saved/delete`；保存接口同时返回国家分组；
+- 单元测试扩展到 25 项，覆盖 NORAD 保存/删除、国家分组和 F10.7 解析。
 
 ## 0.2.0 - 2026-11-15
 

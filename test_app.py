@@ -244,6 +244,85 @@ class SavedNoradTest(unittest.TestCase):
                 )
 
 
+class NoradCountryTest(unittest.TestCase):
+    @staticmethod
+    def gcat_line(satcat, state):
+        parts = ["-"] * 40
+        parts[0] = "S" + satcat
+        parts[1] = satcat
+        parts[15] = state
+        return "\t".join(parts)
+
+    def setUp(self):
+        app.GCAT_LAST_FAILURE["time"] = 0.0
+
+    def test_parse_gcat_states(self):
+        text = "\n".join(
+            [
+                "#JCAT\tSatcat\tName\tState",
+                self.gcat_line("65106", "CN"),
+                self.gcat_line("25544", "US"),
+                self.gcat_line("99999", "-"),
+            ]
+        )
+        self.assertEqual(
+            app.parse_gcat_states(text, [65106, 25544, 99999]),
+            {"65106": "CN", "25544": "US"},
+        )
+        self.assertEqual(
+            app.parse_gcat_states(text),
+            {"65106": "CN", "25544": "US"},
+        )
+
+    def test_group_norad_ids_by_country(self):
+        groups = app.group_norad_ids_by_country(
+            [65106, 25544, 99999, 43013],
+            {"65106": "CN", "25544": "US", "43013": "RU"},
+        )
+        self.assertEqual(groups["china"], [65106])
+        self.assertEqual(groups["foreign"], [25544, 43013])
+        self.assertEqual(groups["unknown"], [99999])
+
+    def test_saved_norad_response_uses_cached_gcat_states(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory) / "norad_countries.json"
+            with (
+                mock.patch.object(app, "GCAT_CACHE_FILE", cache),
+                mock.patch.object(
+                    app,
+                    "fetch_gcat_states",
+                    return_value={"65106": "CN", "25544": "US"},
+                ) as fetch,
+            ):
+                first = app.saved_norad_response({"norad_ids": [65106, 25544, 99999], "count": 3})
+                self.assertEqual(first["groups"]["china"], [65106])
+                self.assertEqual(first["groups"]["foreign"], [25544])
+                self.assertEqual(first["groups"]["unknown"], [99999])
+                self.assertEqual(first["states"], {"65106": "CN", "25544": "US"})
+                self.assertEqual(fetch.call_count, 1)
+                self.assertTrue(cache.is_file())
+
+                second = app.saved_norad_response({"norad_ids": [65106, 25544, 99999], "count": 3})
+                self.assertEqual(fetch.call_count, 1)
+                self.assertEqual(second["groups"]["unknown"], [99999])
+
+    def test_saved_norad_response_marks_unknown_when_gcat_unavailable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory) / "norad_countries.json"
+            with (
+                mock.patch.object(app, "GCAT_CACHE_FILE", cache),
+                mock.patch.object(
+                    app,
+                    "fetch_gcat_states",
+                    side_effect=OSError("offline"),
+                ),
+            ):
+                payload = app.saved_norad_response({"norad_ids": [25544], "count": 1})
+                self.assertEqual(payload["groups"]["unknown"], [25544])
+                self.assertIn("warning", payload["classification"])
+                self.assertFalse(cache.exists())
+
+
 class F107ParseTest(unittest.TestCase):
     @staticmethod
     def omni_line(year, day_of_year, hour, flux):

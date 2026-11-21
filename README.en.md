@@ -43,7 +43,7 @@ optional development tools; Ruff/Black currently require Python 3.10+.
 - APS osculating/mean element conversion with copy-mean support;
 - SGP4 TLE-to-ECEF propagation;
 - Celestrak lookup for up to 10 NORAD IDs with per-row/all copy, plus a local
-  saved-ID list with add/delete actions;
+  saved-ID list with add/delete actions and GCAT-based China/foreign grouping;
 - NASA OMNI2 F10.7 page with latest daily value, 81-day mean, six-month chart,
   and curve CSV copy;
 - Job history, log tail, output downloads, and history cleanup;

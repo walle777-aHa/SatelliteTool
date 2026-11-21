@@ -13,6 +13,7 @@
 | IERS EOP C04 | `runtime/data/EOP/eopFile.txt` | IERS | 2025-01-01 – 2025-12-27 |
 | 卫星 TLE | 在线查询 | Celestrak | 实时数据，受网络和 Celestrak 服务影响 |
 | F10.7 日值 | 在线查询 | NASA OMNI2 | 1 AU 调整值，当前年份/上一年文件，通常滞后数天 |
+| NORAD 国家分类 | `config/user/norad_countries.json` | GCAT | 按 `satcat.tsv` 的 `State` 缓存已保存 ID，首次遇到新 ID 时更新 |
 
 > EOP 文件当前最后日期为 2025-12-27。运行 2026 年及之后的场景时，页面顶部
 > 会显示过期提示；请更新 EOP 数据或在结果中注意 UT1-UTC/极移外推误差。

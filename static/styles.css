@@ -774,7 +774,7 @@ td { color: #cfd9e5; }
 
 .query-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: minmax(360px, 430px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -796,11 +796,43 @@ td { color: #cfd9e5; }
   margin-bottom: 0;
 }
 
+.norad-saved-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.norad-saved-group {
+  min-width: 0;
+}
+
+.norad-saved-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
+
+.norad-saved-group-title {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.norad-saved-count {
+  color: var(--muted);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 11px;
+}
+
 .norad-saved-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 520px;
+  max-height: 460px;
   overflow: auto;
 }
 
@@ -808,11 +840,18 @@ td { color: #cfd9e5; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 5px 6px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--bg-soft);
+}
+
+.norad-saved-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .norad-saved-id {
@@ -821,16 +860,41 @@ td { color: #cfd9e5; }
   font-size: 12px;
 }
 
+.norad-saved-state {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.norad-saved-state.unknown {
+  color: var(--warning);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .norad-saved-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .norad-saved-actions .btn {
-  min-height: 28px;
-  padding: 4px 8px;
+  min-height: 26px;
+  padding: 3px 6px;
+  border-radius: 7px;
   font-size: 11px;
+}
+
+.norad-saved-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.norad-saved-note.warning {
+  color: var(--warning);
 }
 
 .f107-cards {
@@ -934,6 +998,7 @@ td { color: #cfd9e5; }
 
 @media (max-width: 620px) {
   .walle { font-size: 88px; }
+  .norad-saved-groups { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

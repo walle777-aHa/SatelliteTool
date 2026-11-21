@@ -216,6 +216,33 @@ h2 { font-size: 30px; letter-spacing: -0.02em; }
 
 .panel + .panel { margin-top: 16px; }
 
+[data-zone] .panel + .panel { margin-top: 0; }
+
+/* 拖动布局：面板把手与放置高亮 */
+.drag-handle { cursor: grab; }
+
+.drag-handle:active { cursor: grabbing; }
+
+.drag-handle.panel-title::before,
+.panel-head.drag-handle .panel-title::before {
+  content: "⋮⋮";
+  margin-right: 8px;
+  color: var(--muted);
+  opacity: 0.65;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.panel.dragging {
+  opacity: 0.45;
+}
+
+[data-zone].drop-active {
+  outline: 2px dashed var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius);
+}
+
 .panel-title {
   margin-bottom: 14px;
   color: var(--text);
@@ -780,6 +807,9 @@ td { color: #cfd9e5; }
 }
 
 .query-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -986,6 +1016,12 @@ td { color: #cfd9e5; }
   margin: 16px 0;
 }
 
+.f107-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .f107-card {
   display: flex;
   flex-direction: column;
@@ -1014,10 +1050,6 @@ td { color: #cfd9e5; }
 .f107-card small {
   color: var(--muted);
   font-size: 12px;
-}
-
-.f107-chart-box {
-  margin-top: 16px;
 }
 
 #f107Chart {

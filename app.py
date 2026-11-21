@@ -70,6 +70,7 @@ PREVIEW_CACHE: Dict[Tuple[str, int, int, int, int, Optional[int]], Dict[str, Any
 PREVIEW_CACHE_LOCK = threading.Lock()
 PREVIEW_CACHE_MAX = 8
 LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+QUIET_CONNECTION_ERRORS = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
 STATIC_MIME_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".css": "text/css; charset=utf-8",
@@ -1652,7 +1653,7 @@ class Handler(BaseHTTPRequestHandler):
             self.close_connection = True
         try:
             self.send_json(error.status, {"ok": False, "error": error.message})
-        except (BrokenPipeError, ConnectionResetError):
+        except QUIET_CONNECTION_ERRORS:
             pass
 
     def enforce_safety(self) -> None:
@@ -1736,7 +1737,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_download(target, name)
                 return
             self.send_static(path)
-        except (BrokenPipeError, ConnectionResetError):
+        except QUIET_CONNECTION_ERRORS:
             return
         except ApiError as error:
             self.send_error_json(error)
@@ -1786,7 +1787,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, self.manager.stop(match.group(1)))
                 return
             raise ApiError(404, "接口不存在")
-        except (BrokenPipeError, ConnectionResetError):
+        except QUIET_CONNECTION_ERRORS:
             return
         except ApiError as error:
             self.send_error_json(error)
@@ -1807,7 +1808,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {"ok": True, **self.manager.delete_job(match.group(1))})
                 return
             raise ApiError(404, "接口不存在")
-        except (BrokenPipeError, ConnectionResetError):
+        except QUIET_CONNECTION_ERRORS:
             return
         except ApiError as error:
             self.send_error_json(error)
@@ -1906,7 +1907,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not chunk:
                         break
                     self.wfile.write(chunk)
-        except (BrokenPipeError, ConnectionResetError):
+        except QUIET_CONNECTION_ERRORS:
             return
 
 

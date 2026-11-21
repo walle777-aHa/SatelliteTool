@@ -44,7 +44,9 @@ app.py（标准库 ThreadingHTTPServer）
 8. F10.7：读取 NASA OMNI2 当前年和上一年文件，计算日值和 81 天均值，缓存 30 分钟；
 9. NORAD 保存：读写 `config/user/norad_ids.txt`，支持追加和单条删除；
 10. NORAD 国家分组：读取 GCAT `satcat.tsv` 的 `State`，按已保存 ID 缓存到
-    `config/user/norad_countries.json`；未匹配 ID 归入国外列。
+    `config/user/norad_countries.json`；未匹配 ID 归入国外列；
+11. 拖动布局：前端按住面板标题拖动重排（APS/TLE/查询/F10.7 页），顺序
+    保存在浏览器 localStorage。
 
 ## 任务生命周期
 

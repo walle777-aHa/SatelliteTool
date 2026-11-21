@@ -12,6 +12,7 @@
     recentLaunches: null,
     recentLaunchesAt: 0,
     recentLaunchesLoading: false,
+    drag: null,
     f107: null,
     f107Loading: false,
     pollFailures: 0,
@@ -1514,6 +1515,134 @@
     requestAnimationFrame(tick);
   }
 
+  const LAYOUT_STORAGE_KEY = "satelliteTool.layout.v1";
+
+  function readSavedLayout() {
+    try {
+      const raw = window.localStorage.getItem(LAYOUT_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function zonePanels(zone) {
+    return $$("[data-panel]", zone).filter((panel) => panel.parentElement === zone);
+  }
+
+  function panelHandle(panel) {
+    return panel.querySelector(".panel-head") || panel.querySelector(".panel-title");
+  }
+
+  function saveLayout() {
+    const payload = {};
+    $$("[data-zone]").forEach((zone) => {
+      payload[zone.dataset.zone] = zonePanels(zone).map((panel) => panel.dataset.panel);
+    });
+    try {
+      window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      // 本地存储不可用时静默忽略，布局仅在本次会话生效
+    }
+  }
+
+  function clearDropActive() {
+    $$("[data-zone].drop-active").forEach((zone) => zone.classList.remove("drop-active"));
+  }
+
+  function onDragStart(event) {
+    const handle = event.target.closest(".drag-handle");
+    const panel = handle && handle.closest("[data-panel]");
+    if (!panel || !panel.parentElement) return;
+    state.drag = {
+      panel,
+      fromZone: panel.parentElement,
+      nextSibling: panel.nextElementSibling,
+      dropped: false,
+    };
+    event.dataTransfer.effectAllowed = "move";
+    try {
+      event.dataTransfer.setData("text/plain", panel.dataset.panel);
+    } catch (error) {
+      // 个别浏览器可能不允许写入 dataTransfer
+    }
+    window.setTimeout(() => {
+      if (state.drag && state.drag.panel === panel) {
+        panel.classList.add("dragging");
+      }
+    }, 0);
+  }
+
+  function onDragOver(event) {
+    if (!state.drag) return;
+    const zone = event.currentTarget;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    clearDropActive();
+    zone.classList.add("drop-active");
+    const panel = state.drag.panel;
+    const candidates = zonePanels(zone).filter((item) => item !== panel);
+    let before = null;
+    for (const item of candidates) {
+      const rect = item.getBoundingClientRect();
+      if (event.clientY < rect.top + rect.height / 2) {
+        before = item;
+        break;
+      }
+    }
+    if (before) zone.insertBefore(panel, before);
+    else zone.appendChild(panel);
+  }
+
+  function onDrop(event) {
+    if (!state.drag) return;
+    event.preventDefault();
+    state.drag.dropped = true;
+    saveLayout();
+  }
+
+  function onDragEnd() {
+    const drag = state.drag;
+    state.drag = null;
+    clearDropActive();
+    if (!drag) return;
+    drag.panel.classList.remove("dragging");
+    if (!drag.dropped) {
+      // 未完成放置（在放置区外松开）时还原到原位置
+      if (drag.nextSibling && drag.nextSibling !== drag.panel &&
+          drag.nextSibling.parentElement === drag.fromZone) {
+        drag.fromZone.insertBefore(drag.panel, drag.nextSibling);
+      } else {
+        drag.fromZone.appendChild(drag.panel);
+      }
+    }
+  }
+
+  function initDraggableLayout() {
+    const saved = readSavedLayout();
+    $$("[data-zone]").forEach((zone) => {
+      const order = Array.isArray(saved[zone.dataset.zone]) ? saved[zone.dataset.zone] : [];
+      order.forEach((panelId) => {
+        if (typeof panelId !== "string" || !/^[a-z0-9-]+$/.test(panelId)) return;
+        const panel = document.querySelector('[data-panel="' + panelId + '"]');
+        if (panel) zone.appendChild(panel);
+      });
+      zonePanels(zone).forEach((panel) => {
+        const handle = panelHandle(panel);
+        if (!handle) return;
+        handle.classList.add("drag-handle");
+        handle.draggable = true;
+        handle.title = "按住拖动以调整布局";
+        handle.addEventListener("dragstart", onDragStart);
+        handle.addEventListener("dragend", onDragEnd);
+      });
+      zone.addEventListener("dragover", onDragOver);
+      zone.addEventListener("drop", onDrop);
+    });
+  }
+
   function bind() {
     $$(".nav-btn").forEach((button) => {
       button.addEventListener("click", () => switchPage(button.dataset.page));
@@ -1556,6 +1685,7 @@
 
   async function boot() {
     bind();
+    initDraggableLayout();
     initWalle();
     const page = pageFromHash();
     switchPage(page, false);

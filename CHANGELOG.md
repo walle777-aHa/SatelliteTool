@@ -13,6 +13,8 @@
 - TLE 查询页左侧新增“最新一天发射的航天器”：从 CelesTrak SATCAT 最近
   30 天记录中提取最新发射日的载荷，显示名称、NORAD ID、国家/发射场和在轨
   状态，支持一键加入查询栏；
+- 轨道转换、TLE 递推、TLE 查询和 F10.7 页面支持按住面板标题拖动调整布局，
+  布局保存在浏览器 localStorage；
 - 新增 API：`GET /api/f107`、`GET/POST /api/norad/saved`、
   `POST /api/norad/saved/delete`、`GET /api/celestrak/recent-launches`；
   保存接口同时返回国家分组；

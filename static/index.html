@@ -169,9 +169,11 @@
         </div>
         <span class="hint">调用 bin/ApsOrbitTool.exe</span>
       </div>
-      <div class="layout two-column">
-        <form class="panel" id="apsForm">
-          <div class="panel-title">输入</div>
+      <div class="layout two-column" id="aps-layout" data-zone="aps">
+        <form class="panel" id="apsForm" data-panel="aps-form">
+          <div class="panel-head">
+            <div class="panel-title">输入</div>
+          </div>
           <label class="field"><span>方向</span>
             <select id="apsMode">
               <option value="o2m">瞬根 → 平根</option>
@@ -189,7 +191,7 @@
           </div>
           <button class="btn primary" type="submit">开始转换</button>
         </form>
-        <div class="panel">
+        <div class="panel" data-panel="aps-result">
           <div class="panel-head">
             <div class="panel-title">结果</div>
             <button class="btn ghost" id="copyAps" type="button" disabled>复制平根</button>
@@ -246,9 +248,11 @@
         </div>
         <span class="hint">调用 bin/Sgp4EcefTool.exe</span>
       </div>
-      <div class="layout two-column">
-        <form class="panel" id="tleForm">
-          <div class="panel-title">两行 TLE</div>
+      <div class="layout two-column" id="tle-layout" data-zone="tle">
+        <form class="panel" id="tleForm" data-panel="tle-form">
+          <div class="panel-head">
+            <div class="panel-title">两行 TLE</div>
+          </div>
           <label class="field"><span>第一行</span><textarea id="tleLine1" rows="3" required>1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753</textarea></label>
           <label class="field"><span>第二行</span><textarea id="tleLine2" rows="3" required>2 00005  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667</textarea></label>
           <div class="form-grid three">
@@ -258,8 +262,10 @@
           </div>
           <button class="btn primary" type="submit">开始递推</button>
         </form>
-        <div class="panel">
-          <div class="panel-title">地固系 RV</div>
+        <div class="panel" data-panel="tle-result">
+          <div class="panel-head">
+            <div class="panel-title">地固系 RV</div>
+          </div>
           <pre id="tleMeta" class="console">等待输入...</pre>
           <div class="table-wrap">
             <table id="tleTable"><thead></thead><tbody></tbody></table>
@@ -277,8 +283,8 @@
         <span class="hint">在线查询，最多 10 颗</span>
       </div>
       <div class="query-layout">
-        <aside class="query-side">
-          <section class="panel norad-saved-panel">
+        <aside class="query-side" data-zone="query-side">
+          <section class="panel norad-saved-panel" data-panel="query-saved">
             <div class="panel-head">
               <div class="panel-title">已保存 NORAD ID</div>
               <span id="noradSavedMeta" class="hint">0 个</span>
@@ -307,7 +313,7 @@
               国家分类：GCAT State（CN 为中国）
             </p>
           </section>
-          <section class="panel recent-launch-panel">
+          <section class="panel recent-launch-panel" data-panel="query-recent">
             <div class="panel-head">
               <div class="panel-title">最新一天发射的航天器</div>
               <button class="btn ghost" id="refreshRecentLaunches" type="button">刷新</button>
@@ -321,9 +327,11 @@
             </p>
           </section>
         </aside>
-        <div class="query-main">
-          <div class="panel">
-            <div class="panel-title">NORAD ID</div>
+        <div class="query-main" data-zone="query-main">
+          <div class="panel" data-panel="query-input">
+            <div class="panel-head">
+              <div class="panel-title">NORAD ID</div>
+            </div>
             <textarea id="noradIds" rows="2" placeholder="例如：25544, 48274" required></textarea>
             <div class="button-row">
               <button class="btn primary" id="queryTle">查询</button>
@@ -333,7 +341,12 @@
             </div>
             <p id="queryMessage" class="hint"></p>
           </div>
-          <div id="queryResults" class="table-wrap query-results"></div>
+          <div class="panel query-results-panel" data-panel="query-results">
+            <div class="panel-head">
+              <div class="panel-title">查询结果</div>
+            </div>
+            <div id="queryResults" class="table-wrap query-results"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -346,32 +359,34 @@
         </div>
         <span class="hint">NASA OMNI2 F10.7</span>
       </div>
-      <div class="panel">
-        <div class="panel-head">
-          <div class="panel-title">F10.7 太阳射电通量</div>
-          <button class="btn ghost" id="f107Refresh">刷新数据</button>
-        </div>
-        <p id="f107Message" class="hint">进入页面后加载最新数据</p>
+      <div class="f107-layout" data-zone="f107">
+        <section class="panel" data-panel="f107-cards">
+          <div class="panel-head">
+            <div class="panel-title">F10.7 太阳射电通量</div>
+            <button class="btn ghost" id="f107Refresh">刷新数据</button>
+          </div>
+          <p id="f107Message" class="hint">进入页面后加载最新数据</p>
 
-        <div id="f107Cards" class="f107-cards" hidden>
-          <article class="f107-card">
-            <span>最新 F10.7</span>
-            <strong><span id="f107LatestFlux">-</span><small> sfu</small></strong>
-            <small id="f107LatestDate">-</small>
-          </article>
-          <article class="f107-card">
-            <span>81 天均值</span>
-            <strong><span id="f107Last81">-</span><small> sfu</small></strong>
-            <small>最近 81 天观测</small>
-          </article>
-          <article class="f107-card">
-            <span>半年样本</span>
-            <strong id="f107SampleCount">-</strong>
-            <small id="f107SampleRange">-</small>
-          </article>
-        </div>
+          <div id="f107Cards" class="f107-cards" hidden>
+            <article class="f107-card">
+              <span>最新 F10.7</span>
+              <strong><span id="f107LatestFlux">-</span><small> sfu</small></strong>
+              <small id="f107LatestDate">-</small>
+            </article>
+            <article class="f107-card">
+              <span>81 天均值</span>
+              <strong><span id="f107Last81">-</span><small> sfu</small></strong>
+              <small>最近 81 天观测</small>
+            </article>
+            <article class="f107-card">
+              <span>半年样本</span>
+              <strong id="f107SampleCount">-</strong>
+              <small id="f107SampleRange">-</small>
+            </article>
+          </div>
+        </section>
 
-        <div id="f107ChartBox" class="f107-chart-box" hidden>
+        <section class="panel" id="f107ChartBox" data-panel="f107-chart" hidden>
           <div class="panel-head">
             <div class="panel-title">近半年日观测曲线</div>
             <div class="button-row compact">
@@ -380,10 +395,15 @@
             </div>
           </div>
           <canvas id="f107Chart" width="1200" height="340" aria-label="F10.7 近半年日观测曲线"></canvas>
-        </div>
+        </section>
 
-        <p id="f107Warning" class="f107-warning hidden"></p>
-        <p class="hint">数据源：NASA OMNI2（F10.7，1 AU）· 日值可能有数天滞后</p>
+        <section class="panel" data-panel="f107-notes">
+          <div class="panel-head">
+            <div class="panel-title">说明</div>
+          </div>
+          <p id="f107Warning" class="f107-warning hidden"></p>
+          <p class="hint">数据源：NASA OMNI2（F10.7，1 AU）· 日值可能有数天滞后</p>
+        </section>
       </div>
     </section>
   </main>

@@ -23,7 +23,8 @@
   },
   "celestrak": {
     "timeout_s": 20,
-    "cache_ttl_s": 300
+    "cache_ttl_s": 300,
+    "recent_launches_cache_ttl_s": 1800
   },
   "f107": {
     "timeout_s": 20,

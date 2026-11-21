@@ -47,8 +47,13 @@ EPOCH_RE = re.compile(r"^\d{8}T\d{6}\.\d{4}$")
 CELESTRAK_GP_TLE = "https://celestrak.org/NORAD/elements/gp.php?CATNR={id}&FORMAT=TLE"
 CELESTRAK_GP_JSON = "https://celestrak.org/NORAD/elements/gp.php?CATNR={id}&FORMAT=JSON"
 CELESTRAK_SATCAT = "https://celestrak.org/satcat/records.php?CATNR={id}&FORMAT=JSON"
+CELESTRAK_RECENT_LAUNCHES = (
+    "https://celestrak.org/satcat/records.php?GROUP=last-30-days&FORMAT=JSON"
+)
 CELESTRAK_CACHE: Dict[int, Tuple[float, Dict[str, Any]]] = {}
 CELESTRAK_CACHE_LOCK = threading.Lock()
+RECENT_LAUNCH_CACHE: Dict[str, Any] = {"time": 0.0, "data": None}
+RECENT_LAUNCH_CACHE_LOCK = threading.Lock()
 F107_SOURCE_URL = "https://spdf.gsfc.nasa.gov/pub/data/omni/low_res_omni/omni2_{year}.dat"
 F107_SOURCE_NAME = "NASA OMNI2 (F10.7, 1 AU)"
 F107_CACHE: Dict[str, Any] = {"time": 0.0, "data": None}
@@ -1388,6 +1393,92 @@ def fetch_celestrak_batch(body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "count": len(results), "results": results}
 
 
+def parse_recent_launches(records: Any) -> Dict[str, Any]:
+    """Select payloads launched on the most recent launch day."""
+    if not isinstance(records, list):
+        raise ValueError("最新发射数据格式无效")
+
+    payloads: List[Dict[str, Any]] = []
+    for entry in records:
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("OBJECT_TYPE", "")).strip().upper() != "PAY":
+            continue
+        launch_date = str(entry.get("LAUNCH_DATE", "")).strip()
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", launch_date):
+            continue
+        try:
+            norad_id = int(entry.get("NORAD_CAT_ID"))
+        except (TypeError, ValueError):
+            continue
+        if norad_id <= 0:
+            continue
+
+        object_id = str(entry.get("OBJECT_ID", "")).strip()
+        decay_date = str(entry.get("DECAY_DATE", "")).strip()
+        payloads.append(
+            {
+                "name": str(entry.get("OBJECT_NAME", "")).strip() or ("NORAD %d" % norad_id),
+                "norad_id": norad_id,
+                "object_id": object_id,
+                "owner": str(entry.get("OWNER", "")).strip(),
+                "launch_date": launch_date,
+                "launch_site": str(entry.get("LAUNCH_SITE", "")).strip(),
+                "decay_date": decay_date,
+                "in_orbit": not decay_date,
+                "tle_available": norad_id <= 99999,
+            }
+        )
+
+    if not payloads:
+        return {"launch_date": "", "count": 0, "objects": []}
+
+    latest_date = max(item["launch_date"] for item in payloads)
+    objects = [item for item in payloads if item["launch_date"] == latest_date]
+    objects.sort(key=lambda item: (item["object_id"], item["norad_id"]))
+    return {"launch_date": latest_date, "count": len(objects), "objects": objects}
+
+
+def fetch_recent_launches(force: bool = False) -> Dict[str, Any]:
+    now = time.time()
+    ttl = float(CONFIG.get("celestrak", {}).get("recent_launches_cache_ttl_s", 1800))
+    with RECENT_LAUNCH_CACHE_LOCK:
+        cached = RECENT_LAUNCH_CACHE["data"]
+        cached_at = RECENT_LAUNCH_CACHE["time"]
+    if not force and cached is not None and now - cached_at < ttl:
+        result = dict(cached)
+        result["cached"] = True
+        return result
+
+    try:
+        raw = celestrak_get(CELESTRAK_RECENT_LAUNCHES)
+        data = parse_recent_launches(json.loads(raw))
+    except (urllib.error.URLError, http.client.HTTPException, OSError, ValueError) as error:
+        with RECENT_LAUNCH_CACHE_LOCK:
+            cached = RECENT_LAUNCH_CACHE["data"]
+        if cached is not None:
+            result = dict(cached)
+            result["cached"] = True
+            result["stale"] = True
+            result["warning"] = "最新发射数据暂不可用，显示上次缓存结果: %s" % error
+            return result
+        raise ApiError(502, "无法获取最新发射数据: %s" % error)
+
+    data.update(
+        {
+            "source": "CelesTrak SATCAT (last 30 days)",
+            "source_url": CELESTRAK_RECENT_LAUNCHES,
+            "fetched_at": now_text(),
+            "cached": False,
+            "stale": False,
+        }
+    )
+    with RECENT_LAUNCH_CACHE_LOCK:
+        RECENT_LAUNCH_CACHE["time"] = time.time()
+        RECENT_LAUNCH_CACHE["data"] = dict(data)
+    return data
+
+
 def run_aps(body: Dict[str, Any]) -> Dict[str, Any]:
     mode = str(body.get("mode", ""))
     if mode not in ("o2m", "m2o"):
@@ -1631,6 +1722,11 @@ class Handler(BaseHTTPRequestHandler):
                 force = query.get("refresh", ["0"])[0].lower() in ("1", "true", "yes")
                 data = fetch_f107(force=force)
                 self.send_json(200, {"ok": True, **data})
+                return
+            if path == "/api/celestrak/recent-launches":
+                query = urllib.parse.parse_qs(parsed.query)
+                force = query.get("refresh", ["0"])[0].lower() in ("1", "true", "yes")
+                self.send_json(200, {"ok": True, **fetch_recent_launches(force=force)})
                 return
             match = re.fullmatch(r"/api/jobs/([A-Za-z0-9_.-]+)/file", path)
             if match:

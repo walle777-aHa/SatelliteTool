@@ -323,6 +323,54 @@ class NoradCountryTest(unittest.TestCase):
                 self.assertFalse(cache.exists())
 
 
+class RecentLaunchParseTest(unittest.TestCase):
+    @staticmethod
+    def record(name, norad_id, object_id, launch_date, object_type="PAY", decay_date=""):
+        return {
+            "OBJECT_NAME": name,
+            "NORAD_CAT_ID": norad_id,
+            "OBJECT_ID": object_id,
+            "OBJECT_TYPE": object_type,
+            "OWNER": "PRC",
+            "LAUNCH_DATE": launch_date,
+            "LAUNCH_SITE": "TAISC",
+            "DECAY_DATE": decay_date,
+        }
+
+    def test_selects_payloads_from_latest_launch_day(self):
+        records = [
+            self.record("OLD SAT", 10001, "2026-250A", "2026-11-10"),
+            self.record("ROCKET BODY", 101416, "2026-259B", "2026-11-18", "R/B"),
+            self.record("NEW SAT B", 101416, "2026-259B", "2026-11-18"),
+            self.record("NEW SAT A", 62609, "2026-259A", "2026-11-18"),
+            self.record("DEBRIS", 101417, "2026-259C", "2026-11-18", "DEB"),
+        ]
+        result = app.parse_recent_launches(records)
+        self.assertEqual(result["launch_date"], "2026-11-18")
+        self.assertEqual(result["count"], 2)
+        self.assertEqual(
+            [item["object_id"] for item in result["objects"]],
+            ["2026-259A", "2026-259B"],
+        )
+        self.assertTrue(result["objects"][0]["tle_available"])
+        self.assertFalse(result["objects"][1]["tle_available"])
+        self.assertTrue(result["objects"][0]["in_orbit"])
+
+    def test_ignores_non_payloads_and_invalid_dates(self):
+        result = app.parse_recent_launches(
+            [
+                self.record("ROCKET BODY", 10001, "2026-259B", "2026-11-18", "R/B"),
+                self.record("BAD DATE", 10002, "2026-259C", "2026/11/18"),
+                {"OBJECT_TYPE": "PAY", "LAUNCH_DATE": "2026-11-18"},
+            ]
+        )
+        self.assertEqual(result, {"launch_date": "", "count": 0, "objects": []})
+
+    def test_rejects_non_list_payload(self):
+        with self.assertRaises(ValueError):
+            app.parse_recent_launches({"results": []})
+
+
 class F107ParseTest(unittest.TestCase):
     @staticmethod
     def omni_line(year, day_of_year, hour, flux):

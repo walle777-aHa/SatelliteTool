@@ -9,6 +9,9 @@
     chartColumns: [],
     tleResults: [],
     savedNoradIds: [],
+    recentLaunches: null,
+    recentLaunchesAt: 0,
+    recentLaunchesLoading: false,
     f107: null,
     f107Loading: false,
     pollFailures: 0,
@@ -85,7 +88,15 @@
       section.classList.toggle("active", section.id === "page-" + page);
     });
     if (page === "sim") loadJobs();
-    if (page === "query") loadSavedNoradIds();
+    if (page === "query") {
+      loadSavedNoradIds();
+      if (
+        !state.recentLaunches ||
+        Date.now() - state.recentLaunchesAt > 5 * 60 * 1000
+      ) {
+        loadRecentLaunches();
+      }
+    }
     if (page === "f107") {
       if (!state.f107 && !state.f107Loading) {
         loadF107();
@@ -1044,6 +1055,124 @@
     }
   }
 
+  async function loadRecentLaunches(force = false) {
+    const button = $("#refreshRecentLaunches");
+    const list = $("#recentLaunchList");
+    const meta = $("#recentLaunchMeta");
+    const note = $("#recentLaunchNote");
+    if (!list || state.recentLaunchesLoading) return;
+    state.recentLaunchesLoading = true;
+    if (button) button.disabled = true;
+    meta.textContent = "加载中...";
+    list.innerHTML = '<p class="hint">加载中...</p>';
+    try {
+      const data = await api(
+        "/api/celestrak/recent-launches" + (force ? "?refresh=1" : ""),
+        { timeoutMs: 60000 }
+      );
+      state.recentLaunches = data;
+      state.recentLaunchesAt = Date.now();
+      renderRecentLaunches(data);
+    } catch (error) {
+      state.recentLaunches = null;
+      meta.textContent = "加载失败";
+      list.innerHTML =
+        '<p class="error-text">' + escapeHtml(error.message) + "</p>";
+      note.className = "hint norad-saved-note warning";
+      note.textContent = "最新发射数据加载失败，请稍后重试";
+    } finally {
+      state.recentLaunchesLoading = false;
+      if (button) button.disabled = false;
+    }
+  }
+
+  function renderRecentLaunches(data) {
+    const list = $("#recentLaunchList");
+    const meta = $("#recentLaunchMeta");
+    const note = $("#recentLaunchNote");
+    const objects = Array.isArray(data.objects) ? data.objects : [];
+    list.textContent = "";
+
+    if (!data.launch_date || !objects.length) {
+      meta.textContent = "最近 30 天暂无发射记录";
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "暂无";
+      list.appendChild(empty);
+      note.className = "hint norad-saved-note";
+      note.textContent = "数据源：CelesTrak SATCAT · 仅显示载荷（PAY）";
+      return;
+    }
+
+    meta.textContent = data.launch_date + " · " + objects.length + " 颗载荷";
+
+    let unsupported = 0;
+    objects.forEach((entry) => {
+      if (entry.tle_available === false) unsupported += 1;
+
+      const item = document.createElement("div");
+      item.className = "recent-launch-item";
+
+      const info = document.createElement("div");
+      info.className = "recent-launch-info";
+
+      const name = document.createElement("span");
+      name.className = "recent-launch-name";
+      name.textContent = entry.name || "NORAD " + entry.norad_id;
+      name.title = name.textContent;
+
+      const ident = document.createElement("span");
+      ident.className = "recent-launch-meta";
+      ident.textContent =
+        "NORAD " + entry.norad_id +
+        (entry.object_id ? " · " + entry.object_id : "");
+
+      const detail = document.createElement("span");
+      detail.className = "recent-launch-meta";
+      const parts = [];
+      if (entry.owner) parts.push(entry.owner);
+      if (entry.launch_site) parts.push(entry.launch_site);
+      parts.push(entry.in_orbit === false ? "已再入" : "在轨");
+      detail.textContent = parts.join(" · ");
+      detail.title = detail.textContent;
+
+      info.appendChild(name);
+      info.appendChild(ident);
+      info.appendChild(detail);
+
+      const actions = document.createElement("div");
+      actions.className = "recent-launch-actions";
+      const add = document.createElement("button");
+      add.className = "btn ghost";
+      add.type = "button";
+      add.textContent = "添加";
+      if (entry.tle_available === false) {
+        add.disabled = true;
+        add.title = "Celestrak TLE 格式不支持 6 位 NORAD ID";
+      } else {
+        add.addEventListener("click", () => appendSavedNoradId(entry.norad_id));
+      }
+      actions.appendChild(add);
+
+      item.appendChild(info);
+      item.appendChild(actions);
+      list.appendChild(item);
+    });
+
+    if (data.warning) {
+      note.className = "hint norad-saved-note warning";
+      note.textContent = data.warning;
+    } else if (unsupported) {
+      note.className = "hint norad-saved-note warning";
+      note.textContent =
+        unsupported +
+        " 颗 6 位 NORAD ID 暂不支持 TLE 格式，添加按钮不可用";
+    } else {
+      note.className = "hint norad-saved-note";
+      note.textContent = "数据源：CelesTrak SATCAT · 仅显示载荷（PAY）";
+    }
+  }
+
   function appendSavedNoradId(id) {
     const input = $("#noradIds");
     const message = $("#queryMessage");
@@ -1407,6 +1536,7 @@
     $("#tleForm").addEventListener("submit", submitTle);
     $("#queryTle").addEventListener("click", queryTle);
     $("#saveNorad").addEventListener("click", saveNoradIds);
+    $("#refreshRecentLaunches").addEventListener("click", () => loadRecentLaunches(true));
     $("#copyAllTle").addEventListener("click", copyAllTle);
     $("#f107Refresh").addEventListener("click", () => loadF107(true));
     $("#f107Copy").addEventListener("click", copyF107Series);

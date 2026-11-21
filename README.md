@@ -58,7 +58,7 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
 - **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度；
 - **TLE 查询**：Celestrak 查询最多 10 个 NORAD ID，结果按行展示，支持单行/全部
   复制；左侧保存列表支持保存、添加和删除本地 NORAD ID，并按 GCAT 国家代码
-  分为中国/国外两列；
+  分为中国/国外两列；左侧同时显示最近 30 天内最新一个发射日的载荷；
 - **F10.7 空间环境**：NASA OMNI2 最新日值、81 天均值和近 183 天曲线，
   支持复制曲线 CSV；
 - **CSV 定制**：按 JSON 配置选择列、重命名、缩放、偏移和精度；
@@ -117,7 +117,7 @@ SatelliteTool/
     "default_csv_profile": "default"
   },
   "telemetry": { "profiles_dir": "config/telemetry" },
-  "celestrak": { "timeout_s": 20, "cache_ttl_s": 300 },
+  "celestrak": { "timeout_s": 20, "cache_ttl_s": 300, "recent_launches_cache_ttl_s": 1800 },
   "f107": { "timeout_s": 20, "cache_ttl_s": 1800, "window_days": 183 },
   "limits": {
     "max_simulation_time_s": 1000000,
@@ -189,6 +189,11 @@ SatelliteTool/
 入轨日期、TLE 历元与两行 TLE；每行可单独复制，也可复制全部成功结果。
 离线时按 ID 返回错误，不影响其他卫星。
 
+左侧“最新一天发射的航天器”从 CelesTrak SATCAT 的最近 30 天记录中选取最新
+发射日，仅列出载荷（`PAY`），显示名称、NORAD ID、国际编号、国家/发射场和在轨
+状态；数据缓存 30 分钟，可点击“刷新”强制更新。5 位 NORAD ID 可直接“添加”到
+查询栏；6 位 NORAD ID 因 TLE 格式限制暂不可添加。
+
 左侧“已保存 NORAD ID”读取 `config/user/norad_ids.txt`；保存按钮把当前查询栏
 中的 ID 追加到本地文件，列表中的“添加”写入查询栏，“删除”同时从列表和文件移除。
 
@@ -215,6 +220,7 @@ SatelliteTool/
 | GET | `/api/jobs/<id>/log?tail=N` | 日志尾部 |
 | GET | `/api/jobs/<id>/file?name=...` | 下载产物 |
 | GET | `/api/norad/saved` | 读取已保存的 NORAD ID 及中国/国外分组 |
+| GET | `/api/celestrak/recent-launches` | 最新一天发射的载荷 |
 | GET | `/api/f107?refresh=1` | F10.7 最新值与近半年序列 |
 | POST | `/api/run` | `{scenario, simulation_time?, csv_profile}` |
 | POST | `/api/norad/saved` | 保存 `{norad_ids}`（追加去重） |
@@ -254,8 +260,9 @@ python -m black --check .
 node --check static/app.js
 ```
 
-当前测试 25 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
-Host/Origin、Content-Type、任务清理、NORAD 保存/删除、国家分组和 F10.7 解析。
+当前测试 28 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
+Host/Origin、Content-Type、任务清理、NORAD 保存/删除、国家分组、最新发射解析
+和 F10.7 解析。
 
 `app.py` 运行时只使用 Python 标准库，支持 Python 3.9+。Ruff/Black 开发工具
 当前要求 Python 3.10+；CI 在 Python 3.12 上执行 lint，在 3.9–3.13 上执行测试。

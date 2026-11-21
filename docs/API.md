@@ -168,6 +168,41 @@
 
 从本地文件删除单个 ID；返回 `norad_ids`、`removed`、`count`，以及上述分组字段。
 
+### `GET /api/celestrak/recent-launches?refresh=1`
+
+从 CelesTrak SATCAT 的 `GROUP=last-30-days` 记录中选取最新发射日，仅返回
+`OBJECT_TYPE=PAY` 的载荷：
+
+```json
+{
+  "ok": true,
+  "launch_date": "2026-11-18",
+  "count": 1,
+  "objects": [
+    {
+      "name": "SHIJIAN-24 (SJ-24)",
+      "norad_id": 101415,
+      "object_id": "2026-259A",
+      "owner": "PRC",
+      "launch_date": "2026-11-18",
+      "launch_site": "TAISC",
+      "decay_date": "",
+      "in_orbit": true,
+      "tle_available": false
+    }
+  ],
+  "source": "CelesTrak SATCAT (last 30 days)",
+  "source_url": "https://celestrak.org/satcat/records.php?GROUP=last-30-days&FORMAT=JSON",
+  "fetched_at": "2026-11-21 08:05:22",
+  "cached": false,
+  "stale": false
+}
+```
+
+`tle_available` 表示该 NORAD ID 能否用 TLE 格式查询（6 位 ID 为 `false`）。
+缓存时间由 `celestrak.recent_launches_cache_ttl_s` 控制，默认 1800 秒；
+`refresh=1` 强制刷新；数据源失败时返回上次缓存并设置 `stale=true`、`warning`。
+
 ### `GET /api/f107?refresh=1`
 
 返回 NASA OMNI2 最新日 F10.7（1 AU）、81 天均值和近 183 天序列：

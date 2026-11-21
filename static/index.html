@@ -277,34 +277,49 @@
         <span class="hint">在线查询，最多 10 颗</span>
       </div>
       <div class="query-layout">
-        <aside class="panel norad-saved-panel">
-          <div class="panel-head">
-            <div class="panel-title">已保存 NORAD ID</div>
-            <span id="noradSavedMeta" class="hint">0 个</span>
-          </div>
-          <div class="norad-saved-groups">
-            <section class="norad-saved-group">
-              <div class="norad-saved-group-head">
-                <span class="norad-saved-group-title">中国</span>
-                <span id="noradSavedChinaCount" class="norad-saved-count">0</span>
-              </div>
-              <div id="noradSavedChina" class="norad-saved-list">
-                <p class="hint">暂无</p>
-              </div>
-            </section>
-            <section class="norad-saved-group">
-              <div class="norad-saved-group-head">
-                <span class="norad-saved-group-title">国外</span>
-                <span id="noradSavedForeignCount" class="norad-saved-count">0</span>
-              </div>
-              <div id="noradSavedForeign" class="norad-saved-list">
-                <p class="hint">暂无</p>
-              </div>
-            </section>
-          </div>
-          <p id="noradSavedNote" class="hint norad-saved-note">
-            国家分类：GCAT State（CN 为中国）
-          </p>
+        <aside class="query-side">
+          <section class="panel norad-saved-panel">
+            <div class="panel-head">
+              <div class="panel-title">已保存 NORAD ID</div>
+              <span id="noradSavedMeta" class="hint">0 个</span>
+            </div>
+            <div class="norad-saved-groups">
+              <section class="norad-saved-group">
+                <div class="norad-saved-group-head">
+                  <span class="norad-saved-group-title">中国</span>
+                  <span id="noradSavedChinaCount" class="norad-saved-count">0</span>
+                </div>
+                <div id="noradSavedChina" class="norad-saved-list">
+                  <p class="hint">暂无</p>
+                </div>
+              </section>
+              <section class="norad-saved-group">
+                <div class="norad-saved-group-head">
+                  <span class="norad-saved-group-title">国外</span>
+                  <span id="noradSavedForeignCount" class="norad-saved-count">0</span>
+                </div>
+                <div id="noradSavedForeign" class="norad-saved-list">
+                  <p class="hint">暂无</p>
+                </div>
+              </section>
+            </div>
+            <p id="noradSavedNote" class="hint norad-saved-note">
+              国家分类：GCAT State（CN 为中国）
+            </p>
+          </section>
+          <section class="panel recent-launch-panel">
+            <div class="panel-head">
+              <div class="panel-title">最新一天发射的航天器</div>
+              <button class="btn ghost" id="refreshRecentLaunches" type="button">刷新</button>
+            </div>
+            <p id="recentLaunchMeta" class="hint">加载中...</p>
+            <div id="recentLaunchList" class="recent-launch-list">
+              <p class="hint">暂无</p>
+            </div>
+            <p id="recentLaunchNote" class="hint norad-saved-note">
+              数据源：CelesTrak SATCAT · 仅显示载荷（PAY）
+            </p>
+          </section>
         </aside>
         <div class="query-main">
           <div class="panel">

@@ -783,9 +783,15 @@ td { color: #cfd9e5; }
   min-width: 0;
 }
 
-.norad-saved-panel {
+.query-side {
   position: sticky;
   top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .norad-saved-panel .panel-head {
@@ -897,6 +903,82 @@ td { color: #cfd9e5; }
   color: var(--warning);
 }
 
+.recent-launch-panel .panel-head {
+  margin-bottom: 10px;
+}
+
+.recent-launch-panel .panel-title {
+  margin-bottom: 0;
+}
+
+.recent-launch-panel .btn {
+  min-height: 26px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.recent-launch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.recent-launch-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.recent-launch-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.recent-launch-name {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-launch-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-launch-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.recent-launch-actions .btn {
+  min-height: 26px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.recent-launch-actions .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .f107-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -992,8 +1074,14 @@ td { color: #cfd9e5; }
   .home-page { margin-top: -18px; }
   .walle { font-size: 108px; }
   .query-layout { grid-template-columns: 1fr; }
-  .norad-saved-panel { position: static; }
+  .query-side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
   .norad-saved-list { max-height: 240px; }
+  .recent-launch-list { max-height: 240px; }
 }
 
 @media (max-width: 620px) {

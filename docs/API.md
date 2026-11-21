@@ -108,6 +108,44 @@
 `mode` 为 `o2m`（瞬根→平根）或 `m2o`（平根→瞬根）。返回 `result` 对象，
 包含 `input`、`osculating`、`mean`、`epoch` 和 `end_of_life`。
 
+### `POST /api/orbit/convert`
+
+J2000 位置速度与六根数（`a/e/i/Ω/ω/M`）双向转换，纯 Python 二体计算，
+`mu` 可选，默认 398600.4418 km³/s²。
+
+RV → 六根数：
+
+```json
+{
+  "mode": "rv2el",
+  "mu": 398600.4418,
+  "r_km": [477.5, -848.5, 6927.4],
+  "v_km_s": [-6.5397, -3.7748, -0.0057]
+}
+```
+
+返回 `result.mode = "rv2el"`，`result.elements` 包含 `a_km`、`e`、`i_deg`、
+`raan_deg`、`argp_deg`、`m_deg`、`nu_deg`、`period_min`、`r_norm_km`、
+`v_norm_km_s`。
+
+六根数 → RV：
+
+```json
+{
+  "mode": "el2rv",
+  "mu": 398600.4418,
+  "a_km": 7000,
+  "e": 0.001,
+  "i_deg": 98,
+  "raan_deg": 30,
+  "argp_deg": 40,
+  "m_deg": 50
+}
+```
+
+返回 `result.mode = "el2rv"`，包含 `r_km`、`v_km_s`、`r_norm_km`、
+`v_norm_km_s`。仅支持椭圆轨道（`e < 1`、能量为负），否则返回 400。
+
 ### `POST /api/sgp4`
 
 ```json

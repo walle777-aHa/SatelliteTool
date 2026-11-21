@@ -16,11 +16,15 @@
 - 轨道转换、TLE 递推、TLE 查询和 F10.7 页面支持按住面板标题拖动调整布局，
   布局保存在浏览器 localStorage；
 - TLE 递推结果表支持一键复制全部采样点为 CSV；
+- 轨道转换结果表随输入方向自适应：显示“输入/输出”两列并高亮输出列，
+  复制按钮文案与内容跟随方向（平根/瞬根）；
+- 轨道转换页新增 J2000 RV ↔ 六根数双向转换（API `POST /api/orbit/convert`），
+  纯 Python 二体计算，支持修改 μ、结果一键复制；
 - 新增 API：`GET /api/f107`、`GET/POST /api/norad/saved`、
   `POST /api/norad/saved/delete`、`GET /api/celestrak/recent-launches`；
   保存接口同时返回国家分组；
-- 单元测试扩展到 28 项，覆盖 NORAD 保存/删除、国家分组、最新发射解析和
-  F10.7 解析。
+- 单元测试扩展到 33 项，覆盖 NORAD 保存/删除、国家分组、最新发射解析、
+  J2000 RV 六根数互转和 F10.7 解析。
 
 ## 0.2.0 - 2026-11-15
 

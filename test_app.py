@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -321,6 +322,61 @@ class NoradCountryTest(unittest.TestCase):
                 self.assertEqual(payload["groups"]["unknown"], [25544])
                 self.assertIn("warning", payload["classification"])
                 self.assertFalse(cache.exists())
+
+
+class OrbitConvertTest(unittest.TestCase):
+    def test_elements_rv_roundtrip(self):
+        body = {
+            "mode": "el2rv",
+            "a_km": 7000,
+            "e": 0.1,
+            "i_deg": 98,
+            "raan_deg": 30,
+            "argp_deg": 40,
+            "m_deg": 50,
+        }
+        rv = app.elements_to_j2000_rv(body)
+        back = app.rv_to_j2000_elements(
+            {"mode": "rv2el", "r_km": rv["r_km"], "v_km_s": rv["v_km_s"]}
+        )
+        self.assertAlmostEqual(back["a_km"], 7000, places=6)
+        self.assertAlmostEqual(back["e"], 0.1, places=9)
+        self.assertAlmostEqual(back["i_deg"], 98, places=6)
+        self.assertAlmostEqual(back["raan_deg"], 30, places=6)
+        self.assertAlmostEqual(back["argp_deg"], 40, places=6)
+        self.assertAlmostEqual(back["m_deg"], 50, places=6)
+
+    def test_circular_equatorial_orbit(self):
+        mu = 398600.4418
+        speed = math.sqrt(mu / 7000.0)
+        elements = app.rv_to_j2000_elements(
+            {"mode": "rv2el", "r_km": [7000.0, 0.0, 0.0], "v_km_s": [0.0, speed, 0.0]}
+        )
+        self.assertAlmostEqual(elements["a_km"], 7000, places=6)
+        self.assertLess(elements["e"], 1e-6)
+        self.assertLess(elements["i_deg"], 1e-6)
+
+    def test_rv_rejects_hyperbolic(self):
+        with self.assertRaises(app.ApiError):
+            app.rv_to_j2000_elements({"mode": "rv2el", "r_km": [7000, 0, 0], "v_km_s": [0, 20, 0]})
+
+    def test_elements_reject_escape_eccentricity(self):
+        with self.assertRaises(app.ApiError):
+            app.elements_to_j2000_rv(
+                {
+                    "mode": "el2rv",
+                    "a_km": 7000,
+                    "e": 1.5,
+                    "i_deg": 98,
+                    "raan_deg": 30,
+                    "argp_deg": 40,
+                    "m_deg": 50,
+                }
+            )
+
+    def test_elements_reject_bad_vector(self):
+        with self.assertRaises(app.ApiError):
+            app.rv_to_j2000_elements({"mode": "rv2el", "r_km": [7000, 0], "v_km_s": [0, 1, 0]})
 
 
 class RecentLaunchParseTest(unittest.TestCase):

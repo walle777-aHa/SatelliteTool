@@ -792,8 +792,8 @@
     return Number(number.toPrecision(12)).toString();
   }
 
-  function formatApsMeanText(result) {
-    if (!result || !result.mean) return "";
+  function formatApsGroupText(group) {
+    if (!group) return "";
     const rows = [
       ["a (km)", "a_km"],
       ["e", "e"],
@@ -803,13 +803,30 @@
       ["M (deg)", "m_deg"],
     ];
     return rows
-      .map(([label, key]) => label + "\t" + formatElement(result.mean[key]))
+      .map(([label, key]) => label + "\t" + formatElement(group[key]))
       .join("\n");
+  }
+
+  function apsOutputInfo(mode) {
+    return mode === "m2o"
+      ? { key: "osculating", label: "瞬根", inputLabel: "平根" }
+      : { key: "mean", label: "平根", inputLabel: "瞬根" };
+  }
+
+  function updateApsResultDirection(mode) {
+    const info = apsOutputInfo(mode);
+    const inputHead = $("#apsInputHead");
+    const outputHead = $("#apsOutputHead");
+    if (inputHead) inputHead.textContent = info.inputLabel + "（输入）";
+    if (outputHead) outputHead.textContent = info.label + "（输出）";
+    const button = $("#copyAps");
+    if (button) button.textContent = "复制" + info.label;
+    labelApsResultInputs();
   }
 
   function clearApsResult() {
     ["A", "E", "I", "Raan", "Argp", "M"].forEach((suffix) => {
-      ["In", "Osc", "Mean"].forEach((prefix) => {
+      ["In", "Out"].forEach((prefix) => {
         $("#aps" + prefix + suffix).value = "";
       });
     });
@@ -880,14 +897,14 @@
         timeoutMs: 60000,
       });
       const result = data.result;
+      const info = apsOutputInfo(result.mode);
       fillApsGroup("In", result.input);
-      fillApsGroup("Osc", result.osculating);
-      fillApsGroup("Mean", result.mean);
-      const direction = result.mode === "o2m" ? "瞬根 → 平根" : "平根 → 瞬根";
+      fillApsGroup("Out", result[info.key]);
+      updateApsResultDirection(result.mode);
       $("#apsMeta").textContent =
-        "模式 " + direction + " · 历元 " + (result.epoch || "-") +
+        "模式 " + info.inputLabel + " → " + info.label + " · 历元 " + (result.epoch || "-") +
         (result.end_of_life ? " · 近地点过低" : "");
-      $("#copyAps").dataset.text = formatApsMeanText(result);
+      $("#copyAps").dataset.text = formatApsGroupText(result[info.key]);
       $("#copyAps").disabled = false;
     } catch (error) {
       $("#apsMeta").textContent = error.message;
@@ -895,6 +912,96 @@
     } finally {
       submit.disabled = false;
     }
+  }
+
+  function renderJ2000Result(result) {
+    const rows = [];
+    if (result.mode === "rv2el") {
+      const el = result.elements || {};
+      rows.push(
+        ["a (km)", el.a_km, 6],
+        ["e", el.e, 9],
+        ["i (deg)", el.i_deg, 6],
+        ["Ω (deg)", el.raan_deg, 6],
+        ["ω (deg)", el.argp_deg, 6],
+        ["M (deg)", el.m_deg, 6],
+        ["ν (deg)", el.nu_deg, 6],
+        ["周期 (min)", el.period_min, 4],
+        ["|r| (km)", el.r_norm_km, 6],
+        ["|v| (km/s)", el.v_norm_km_s, 9]
+      );
+    } else {
+      const r = result.r_km || [];
+      const v = result.v_km_s || [];
+      rows.push(
+        ["X (km)", r[0], 6],
+        ["Y (km)", r[1], 6],
+        ["Z (km)", r[2], 6],
+        ["VX (km/s)", v[0], 9],
+        ["VY (km/s)", v[1], 9],
+        ["VZ (km/s)", v[2], 9],
+        ["|r| (km)", result.r_norm_km, 6],
+        ["|v| (km/s)", result.v_norm_km_s, 9]
+      );
+    }
+    $("#j2000ResultBox").querySelector("tbody").innerHTML = rows
+      .map(
+        ([label, value, precision]) =>
+          '<tr><th scope="row">' + label + "</th><td>" +
+          (value === undefined || value === null ? "-" : Number(value).toFixed(precision)) +
+          "</td></tr>"
+      )
+      .join("");
+    $("#j2000ResultBox").hidden = false;
+    $("#copyJ2000").dataset.text = rows
+      .map(([label, value]) => label + "\t" + formatElement(value))
+      .join("\n");
+    $("#copyJ2000").disabled = false;
+  }
+
+  async function submitJ2000(event) {
+    event.preventDefault();
+    const mode = $("#j2000Mode").value;
+    const body = { mode, mu: $("#j2000Mu").value };
+    if (mode === "rv2el") {
+      body.r_km = ["#j2000X", "#j2000Y", "#j2000Z"].map((id) => $(id).value);
+      body.v_km_s = ["#j2000Vx", "#j2000Vy", "#j2000Vz"].map((id) => $(id).value);
+    } else {
+      body.a_km = $("#j2000A").value;
+      body.e = $("#j2000E").value;
+      body.i_deg = $("#j2000I").value;
+      body.raan_deg = $("#j2000Raan").value;
+      body.argp_deg = $("#j2000Argp").value;
+      body.m_deg = $("#j2000M").value;
+    }
+    const submit = $("#j2000Form").querySelector('button[type="submit"]');
+    const message = $("#j2000Message");
+    submit.disabled = true;
+    $("#copyJ2000").disabled = true;
+    delete $("#copyJ2000").dataset.text;
+    message.className = "hint";
+    message.textContent = "计算中...";
+    try {
+      const data = await api("/api/orbit/convert", {
+        method: "POST",
+        body,
+        timeoutMs: 30000,
+      });
+      renderJ2000Result(data.result);
+      message.textContent = "";
+    } catch (error) {
+      $("#j2000ResultBox").hidden = true;
+      message.className = "hint error-text";
+      message.textContent = error.message;
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  async function copyJ2000Result() {
+    const content = $("#copyJ2000").dataset.text;
+    if (!content) return;
+    await copyText(content, "已复制 J2000 转换结果");
   }
 
   async function submitTle(event) {
@@ -1698,9 +1805,26 @@
     $("#clearJobs").addEventListener("click", clearJobs);
     $("#scenarioSelect").addEventListener("change", updateScenarioHint);
     $("#apsForm").addEventListener("submit", submitAps);
+    $("#apsMode").addEventListener("change", () => {
+      updateApsResultDirection($("#apsMode").value);
+    });
+    $("#j2000Form").addEventListener("submit", submitJ2000);
+    $("#copyJ2000").addEventListener("click", copyJ2000Result);
+    $("#j2000Mode").addEventListener("change", () => {
+      const mode = $("#j2000Mode").value;
+      $("#j2000RvFields").hidden = mode !== "rv2el";
+      $("#j2000ElFields").hidden = mode !== "el2rv";
+      $("#j2000ResultBox").hidden = true;
+      $("#copyJ2000").disabled = true;
+      delete $("#copyJ2000").dataset.text;
+      $("#j2000Message").className = "hint";
+      $("#j2000Message").textContent = "";
+    });
     $("#copyAps").addEventListener("click", () => {
       const content = $("#copyAps").dataset.text;
-      if (content) copyText(content, "已复制平根参数");
+      if (content) {
+        copyText(content, "已复制" + apsOutputInfo($("#apsMode").value).label + "参数");
+      }
     });
     $("#tleForm").addEventListener("submit", submitTle);
     $("#copyTleRv").addEventListener("click", copyTleRv);
@@ -1710,7 +1834,7 @@
     $("#copyAllTle").addEventListener("click", copyAllTle);
     $("#f107Refresh").addEventListener("click", () => loadF107(true));
     $("#f107Copy").addEventListener("click", copyF107Series);
-    labelApsResultInputs();
+    updateApsResultDirection($("#apsMode").value);
     window.addEventListener("hashchange", () => {
       const page = pageFromHash();
       const active = $(".page.active");

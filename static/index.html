@@ -203,43 +203,86 @@
           <div class="table-wrap">
             <table class="aps-result-table">
               <thead>
-                <tr><th scope="col">参数</th><th scope="col">输入</th><th scope="col">瞬根</th><th scope="col">平根</th></tr>
+                <tr>
+                  <th scope="col">参数</th>
+                  <th id="apsInputHead" scope="col">输入</th>
+                  <th id="apsOutputHead" scope="col" class="aps-output-col">输出</th>
+                </tr>
               </thead>
               <tbody>
                 <tr><th>a (km)</th>
                   <td><input id="apsInA" readonly></td>
-                  <td><input id="apsOscA" readonly></td>
-                  <td><input id="apsMeanA" readonly></td>
+                  <td class="aps-output-col"><input id="apsOutA" readonly></td>
                 </tr>
                 <tr><th>e</th>
                   <td><input id="apsInE" readonly></td>
-                  <td><input id="apsOscE" readonly></td>
-                  <td><input id="apsMeanE" readonly></td>
+                  <td class="aps-output-col"><input id="apsOutE" readonly></td>
                 </tr>
                 <tr><th>i (deg)</th>
                   <td><input id="apsInI" readonly></td>
-                  <td><input id="apsOscI" readonly></td>
-                  <td><input id="apsMeanI" readonly></td>
+                  <td class="aps-output-col"><input id="apsOutI" readonly></td>
                 </tr>
                 <tr><th>Ω (deg)</th>
                   <td><input id="apsInRaan" readonly></td>
-                  <td><input id="apsOscRaan" readonly></td>
-                  <td><input id="apsMeanRaan" readonly></td>
+                  <td class="aps-output-col"><input id="apsOutRaan" readonly></td>
                 </tr>
                 <tr><th>ω (deg)</th>
                   <td><input id="apsInArgp" readonly></td>
-                  <td><input id="apsOscArgp" readonly></td>
-                  <td><input id="apsMeanArgp" readonly></td>
+                  <td class="aps-output-col"><input id="apsOutArgp" readonly></td>
                 </tr>
                 <tr><th>M (deg)</th>
                   <td><input id="apsInM" readonly></td>
-                  <td><input id="apsOscM" readonly></td>
-                  <td><input id="apsMeanM" readonly></td>
+                  <td class="aps-output-col"><input id="apsOutM" readonly></td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
+        <section class="panel j2000-panel" data-panel="aps-j2000">
+          <div class="panel-head">
+            <div class="panel-title">J2000 RV ↔ 六根数</div>
+            <button class="btn ghost" id="copyJ2000" type="button" disabled>复制结果</button>
+          </div>
+          <form id="j2000Form">
+            <div class="form-grid three">
+              <label class="field"><span>模式</span>
+                <select id="j2000Mode">
+                  <option value="rv2el">J2000 RV → 六根数</option>
+                  <option value="el2rv">六根数 → J2000 RV</option>
+                </select>
+              </label>
+              <label class="field"><span>μ (km³/s²)</span>
+                <input id="j2000Mu" type="number" step="any" value="398600.4418">
+              </label>
+            </div>
+            <div id="j2000RvFields" class="form-grid three">
+              <label class="field"><span>X (km)</span><input id="j2000X" type="number" step="any"></label>
+              <label class="field"><span>Y (km)</span><input id="j2000Y" type="number" step="any"></label>
+              <label class="field"><span>Z (km)</span><input id="j2000Z" type="number" step="any"></label>
+              <label class="field"><span>VX (km/s)</span><input id="j2000Vx" type="number" step="any"></label>
+              <label class="field"><span>VY (km/s)</span><input id="j2000Vy" type="number" step="any"></label>
+              <label class="field"><span>VZ (km/s)</span><input id="j2000Vz" type="number" step="any"></label>
+            </div>
+            <div id="j2000ElFields" class="form-grid three" hidden>
+              <label class="field"><span>a (km)</span><input id="j2000A" type="number" step="any" value="7000"></label>
+              <label class="field"><span>e</span><input id="j2000E" type="number" step="any" min="0" max="0.999999999" value="0.001"></label>
+              <label class="field"><span>i (deg)</span><input id="j2000I" type="number" step="any" min="0" max="180" value="98"></label>
+              <label class="field"><span>Ω (deg)</span><input id="j2000Raan" type="number" step="any" min="0" max="360" value="30"></label>
+              <label class="field"><span>ω (deg)</span><input id="j2000Argp" type="number" step="any" min="0" max="360" value="40"></label>
+              <label class="field"><span>M (deg)</span><input id="j2000M" type="number" step="any" min="0" max="360" value="50"></label>
+            </div>
+            <div class="button-row">
+              <button class="btn primary" type="submit">开始转换</button>
+              <span id="j2000Message" class="hint"></span>
+            </div>
+          </form>
+          <div id="j2000ResultBox" class="table-wrap" hidden>
+            <table class="j2000-result-table">
+              <thead><tr><th scope="col">参数</th><th scope="col">值</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </section>
 

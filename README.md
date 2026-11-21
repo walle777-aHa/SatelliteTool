@@ -54,7 +54,9 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
   任一边完全离开后都会从对侧进入，并支持方向键控制；
 - **仿真**：选择场景、仿真时长和 CSV 配置，运行 `BlueSpace.exe`；
   预览表显示前 20 行，曲线对完整数据流式降采样；
-- **轨道转换**：调用 `ApsOrbitTool.exe`，结果按输入表单展示，支持一键复制平根；
+- **轨道转换**：调用 `ApsOrbitTool.exe`，结果表随输入方向显示“输入/输出”
+  两列（输出列高亮），一键复制方向对应的输出参数；页面下方另有 J2000 RV
+  与六根数（`a/e/i/Ω/ω/M`）的双向转换；
 - **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度，结果表支持
   一键复制 CSV 数据；
 - **TLE 查询**：Celestrak 查询最多 10 个 NORAD ID，结果按行展示，支持单行/全部
@@ -178,8 +180,15 @@ SatelliteTool/
 
 ### 轨道转换
 
-输入方向、UTC 历元、`a/e/i/Ω/ω/M`，调用 `ApsOrbitTool.exe`。结果以只读表单
-展示输入、瞬根和平根，并可一键复制平根六项参数。
+输入方向、UTC 历元、`a/e/i/Ω/ω/M`，调用 `ApsOrbitTool.exe`。结果表根据方向
+自适应：瞬根 → 平根时显示“瞬根（输入）/ 平根（输出）”，平根 → 瞬根时显示
+“平根（输入）/ 瞬根（输出）”，输出列高亮；复制按钮同步变为“复制平根”或
+“复制瞬根”，内容为对应的输出六项参数。
+
+页面下方“J2000 RV ↔ 六根数”支持双向转换：输入 J2000 位置速度
+（km、km/s）得到 `a/e/i/Ω/ω/M`、真近点角、周期与模长；输入六根数得到
+J2000 位置速度。引力常数 μ 默认 398600.4418 km³/s²，可修改；仅支持椭圆
+轨道（`e < 1`），结果可一键复制。
 
 ### TLE 递推
 
@@ -233,6 +242,7 @@ SatelliteTool/
 | DELETE | `/api/jobs/<id>` | 删除任务 |
 | DELETE | `/api/jobs` | 清理所有非运行中任务 |
 | POST | `/api/aps` | APS 转换 |
+| POST | `/api/orbit/convert` | J2000 RV 与六根数互转 |
 | POST | `/api/sgp4` | SGP4 递推 |
 | POST | `/api/celestrak` | TLE 查询 |
 
@@ -264,9 +274,9 @@ python -m black --check .
 node --check static/app.js
 ```
 
-当前测试 28 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
-Host/Origin、Content-Type、任务清理、NORAD 保存/删除、国家分组、最新发射解析
-和 F10.7 解析。
+当前测试 33 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
+Host/Origin、Content-Type、任务清理、NORAD 保存/删除、国家分组、最新发射解析、
+J2000 RV 六根数互转和 F10.7 解析。
 
 `app.py` 运行时只使用 Python 标准库，支持 Python 3.9+。Ruff/Black 开发工具
 当前要求 Python 3.10+；CI 在 Python 3.12 上执行 lint，在 3.9–3.13 上执行测试。

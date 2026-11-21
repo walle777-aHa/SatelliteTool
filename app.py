@@ -1556,6 +1556,201 @@ def run_aps(body: Dict[str, Any]) -> Dict[str, Any]:
     return {"ok": True, "result": result}
 
 
+def _vec_cross(a: List[float], b: List[float]) -> List[float]:
+    return [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+
+
+def _vec_dot(a: List[float], b: List[float]) -> float:
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _vec_norm(a: List[float]) -> float:
+    return math.sqrt(_vec_dot(a, a))
+
+
+def _atan2_deg(y: float, x: float) -> float:
+    return math.degrees(math.atan2(y, x)) % 360.0
+
+
+def _clamp_one(value: float) -> float:
+    return max(-1.0, min(1.0, value))
+
+
+def _orbit_number(
+    body: Dict[str, Any],
+    key: str,
+    label: str,
+    low: float,
+    high: float,
+    default: Optional[float] = None,
+) -> float:
+    raw = body.get(key, default)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        raise ApiError(400, "%s 必须是数字" % label)
+    if not math.isfinite(value):
+        raise ApiError(400, "%s 必须是有限数字" % label)
+    if value < low or value > high:
+        raise ApiError(400, "%s 超出范围" % label)
+    return value
+
+
+def _orbit_vector(body: Dict[str, Any], key: str) -> List[float]:
+    raw = body.get(key)
+    if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+        raise ApiError(400, "%s 必须是 3 个数字组成的数组" % key)
+    try:
+        return [float(component) for component in raw]
+    except (TypeError, ValueError):
+        raise ApiError(400, "%s 必须是数字" % key)
+
+
+def rv_to_j2000_elements(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert J2000 position/velocity (km, km/s) to classical elements."""
+    mu = _orbit_number(body, "mu", "μ", 1e-6, 1e18, 398600.4418)
+    r_vec = _orbit_vector(body, "r_km")
+    v_vec = _orbit_vector(body, "v_km_s")
+    r = _vec_norm(r_vec)
+    v = _vec_norm(v_vec)
+    if r < 1e-9:
+        raise ApiError(400, "位置矢量模长不能为 0")
+    if v < 1e-9:
+        raise ApiError(400, "速度矢量模长不能为 0")
+
+    h_vec = _vec_cross(r_vec, v_vec)
+    h = _vec_norm(h_vec)
+    if h < 1e-9:
+        raise ApiError(400, "角动量为 0，不构成轨道运动")
+
+    n_vec = _vec_cross([0.0, 0.0, 1.0], h_vec)
+    n = _vec_norm(n_vec)
+    rv = _vec_dot(r_vec, v_vec)
+
+    energy = v * v / 2.0 - mu / r
+    a = -mu / (2.0 * energy)
+    if not math.isfinite(a) or a <= 0:
+        raise ApiError(400, "轨道能量非负（a <= 0），仅支持椭圆轨道")
+
+    e_vec = [((v * v - mu / r) * r_vec[k] - rv * v_vec[k]) / mu for k in range(3)]
+    e = _vec_norm(e_vec)
+    if e >= 1.0:
+        raise ApiError(400, "偏心率 e >= 1，仅支持椭圆轨道")
+
+    i_deg = math.degrees(math.acos(_clamp_one(h_vec[2] / h)))
+    raan_deg = _atan2_deg(n_vec[1], n_vec[0]) if n > 1e-9 else 0.0
+
+    if n > 1e-9 and e > 1e-9:
+        cos_argp = _vec_dot(n_vec, e_vec) / (n * e)
+        sin_argp = _vec_dot(_vec_cross(n_vec, e_vec), h_vec) / (n * e * h)
+        argp_deg = _atan2_deg(sin_argp, cos_argp)
+    elif n <= 1e-9 and e > 1e-9:
+        argp_deg = _atan2_deg(e_vec[1], e_vec[0])
+    else:
+        argp_deg = 0.0
+
+    if e > 1e-9:
+        cos_nu = _vec_dot(e_vec, r_vec) / (e * r)
+        sin_nu = _vec_dot(_vec_cross(e_vec, r_vec), h_vec) / (e * r * h)
+        nu_deg = _atan2_deg(sin_nu, cos_nu)
+    elif n > 1e-9:
+        cos_nu = _vec_dot(n_vec, r_vec) / (n * r)
+        sin_nu = _vec_dot(_vec_cross(n_vec, r_vec), h_vec) / (n * r * h)
+        nu_deg = _atan2_deg(sin_nu, cos_nu)
+    else:
+        nu_deg = _atan2_deg(r_vec[1], r_vec[0])
+
+    nu = math.radians(nu_deg)
+    ecc_anomaly = 2.0 * math.atan2(
+        math.sqrt(1.0 - e) * math.sin(nu / 2.0),
+        math.sqrt(1.0 + e) * math.cos(nu / 2.0),
+    )
+    mean_anomaly = (ecc_anomaly - e * math.sin(ecc_anomaly)) % (2.0 * math.pi)
+    period_min = 2.0 * math.pi * math.sqrt(a * a * a / mu) / 60.0
+
+    return {
+        "a_km": a,
+        "e": e,
+        "i_deg": i_deg,
+        "raan_deg": raan_deg,
+        "argp_deg": argp_deg,
+        "m_deg": math.degrees(mean_anomaly),
+        "nu_deg": nu_deg,
+        "period_min": period_min,
+        "r_norm_km": r,
+        "v_norm_km_s": v,
+    }
+
+
+def elements_to_j2000_rv(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert classical elements to J2000 position/velocity (km, km/s)."""
+    mu = _orbit_number(body, "mu", "μ", 1e-6, 1e18, 398600.4418)
+    a = _orbit_number(body, "a_km", "a_km", 1e-6, 1e12)
+    e = _orbit_number(body, "e", "e", 0.0, 0.999999999)
+    i_deg = _orbit_number(body, "i_deg", "i_deg", 0.0, 180.0)
+    raan_deg = _orbit_number(body, "raan_deg", "raan_deg", 0.0, 360.0)
+    argp_deg = _orbit_number(body, "argp_deg", "argp_deg", 0.0, 360.0)
+    m_deg = _orbit_number(body, "m_deg", "m_deg", 0.0, 360.0)
+
+    mean_anomaly = math.radians(m_deg)
+    ecc_anomaly = mean_anomaly
+    for _ in range(100):
+        residual = ecc_anomaly - e * math.sin(ecc_anomaly) - mean_anomaly
+        ecc_anomaly -= residual / (1.0 - e * math.cos(ecc_anomaly))
+        if abs(residual) < 1e-12:
+            break
+
+    cos_e = math.cos(ecc_anomaly)
+    sin_e = math.sin(ecc_anomaly)
+    r_pf_norm = a * (1.0 - e * cos_e)
+    r_pf = [a * (cos_e - e), a * math.sqrt(1.0 - e * e) * sin_e, 0.0]
+    factor = math.sqrt(mu * a) / r_pf_norm
+    v_pf = [
+        -factor * sin_e,
+        factor * math.sqrt(1.0 - e * e) * cos_e,
+        0.0,
+    ]
+
+    cos_w, sin_w = math.cos(math.radians(argp_deg)), math.sin(math.radians(argp_deg))
+    cos_o, sin_o = math.cos(math.radians(raan_deg)), math.sin(math.radians(raan_deg))
+    cos_i, sin_i = math.cos(math.radians(i_deg)), math.sin(math.radians(i_deg))
+    rotation = [
+        [
+            cos_o * cos_w - sin_o * sin_w * cos_i,
+            -cos_o * sin_w - sin_o * cos_w * cos_i,
+            sin_o * sin_i,
+        ],
+        [
+            sin_o * cos_w + cos_o * sin_w * cos_i,
+            -sin_o * sin_w + cos_o * cos_w * cos_i,
+            -cos_o * sin_i,
+        ],
+        [sin_w * sin_i, cos_w * sin_i, cos_i],
+    ]
+    r_vec = [sum(rotation[row][col] * r_pf[col] for col in range(3)) for row in range(3)]
+    v_vec = [sum(rotation[row][col] * v_pf[col] for col in range(3)) for row in range(3)]
+
+    return {
+        "r_km": r_vec,
+        "v_km_s": v_vec,
+        "r_norm_km": _vec_norm(r_vec),
+        "v_norm_km_s": _vec_norm(v_vec),
+    }
+
+
+def orbit_convert(body: Dict[str, Any]) -> Dict[str, Any]:
+    mode = str(body.get("mode", ""))
+    if mode == "rv2el":
+        return {"mode": "rv2el", "elements": rv_to_j2000_elements(body)}
+    if mode == "el2rv":
+        return {"mode": "el2rv", **elements_to_j2000_rv(body)}
+    raise ApiError(400, "mode 必须是 rv2el 或 el2rv")
+
+
 def run_sgp4(body: Dict[str, Any]) -> Dict[str, Any]:
     line1 = str(body.get("line1", "")).strip()
     line2 = str(body.get("line2", "")).strip()
@@ -1619,6 +1814,12 @@ def run_sgp4(body: Dict[str, Any]) -> Dict[str, Any]:
 class LocalThreadingHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = os.name != "nt"
+
+    def handle_error(self, request, client_address) -> None:  # type: ignore[no-untyped-def]
+        exc_type, _exc_value, _exc_tb = sys.exc_info()
+        if exc_type is not None and issubclass(exc_type, QUIET_CONNECTION_ERRORS):
+            return
+        super().handle_error(request, client_address)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1757,6 +1958,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/aps":
                 self.send_json(200, run_aps(body))
+                return
+            if path == "/api/orbit/convert":
+                self.send_json(200, {"ok": True, "result": orbit_convert(body)})
                 return
             if path == "/api/sgp4":
                 self.send_json(200, run_sgp4(body))

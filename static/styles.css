@@ -1131,6 +1131,24 @@ td { color: #cfd9e5; }
   width: 90px;
 }
 
+.aps-result-table th.aps-output-col,
+.aps-result-table td.aps-output-col {
+  background: rgba(77, 212, 198, 0.07);
+}
+
+.aps-result-table td.aps-output-col input {
+  color: var(--accent);
+  border-color: rgba(77, 212, 198, 0.35);
+}
+
+[data-panel="aps-j2000"] {
+  grid-column: 1 / -1;
+}
+
+.j2000-result-table th:first-child {
+  width: 130px;
+}
+
 .copy-tle {
   min-height: 30px;
   padding: 4px 10px;

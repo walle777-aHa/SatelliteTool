@@ -15,6 +15,7 @@
   状态，支持一键加入查询栏；
 - 轨道转换、TLE 递推、TLE 查询和 F10.7 页面支持按住面板标题拖动调整布局，
   布局保存在浏览器 localStorage；
+- TLE 递推结果表支持一键复制全部采样点为 CSV；
 - 新增 API：`GET /api/f107`、`GET/POST /api/norad/saved`、
   `POST /api/norad/saved/delete`、`GET /api/celestrak/recent-launches`；
   保存接口同时返回国家分组；

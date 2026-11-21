@@ -8,6 +8,7 @@
     chartRows: [],
     chartColumns: [],
     tleResults: [],
+    tleSamples: [],
     savedNoradIds: [],
     recentLaunches: null,
     recentLaunchesAt: 0,
@@ -143,7 +144,7 @@
     if (!element) return;
     const eop = data.eop;
     if (eop?.available && Number(eop.stale_days) > 30) {
-      element.textContent =
+      $("#dataWarningText").textContent =
         "EOP 数据截止 " +
         (eop.last_date || "-") +
         "，已过期 " +
@@ -151,7 +152,7 @@
         " 天；涉及 UT1-UTC/极移的结果可能存在外推误差。";
       element.classList.remove("hidden");
     } else {
-      element.textContent = "";
+      $("#dataWarningText").textContent = "";
       element.classList.add("hidden");
     }
   }
@@ -918,6 +919,8 @@
       $("#tleMeta").textContent =
         "TLE 历元: " + (result.tle_epoch || "-") + "\n采样点数: " + (result.sample_count || 0);
       const samples = result.samples || [];
+      state.tleSamples = samples;
+      $("#copyTleRv").disabled = !samples.length;
       $("#tleTable thead").innerHTML =
         "<tr><th scope=\"col\">t_min</th><th scope=\"col\">UTC</th><th scope=\"col\">X (km)</th><th scope=\"col\">Y (km)</th><th scope=\"col\">Z (km)</th><th scope=\"col\">VX (km/s)</th><th scope=\"col\">VY (km/s)</th><th scope=\"col\">VZ (km/s)</th></tr>";
       $("#tleTable tbody").innerHTML = samples
@@ -935,6 +938,28 @@
     } finally {
       submit.disabled = false;
     }
+  }
+
+  function tleRvCsv() {
+    const header =
+      "t_min,UTC,X (km),Y (km),Z (km),VX (km/s),VY (km/s),VZ (km/s)";
+    const rows = state.tleSamples.map((sample) =>
+      [
+        Number(sample.t_min).toFixed(2),
+        sample.utc || "",
+        ...(sample.r_km || []).map((value) => Number(value).toFixed(3)),
+        ...(sample.v_km_s || []).map((value) => Number(value).toFixed(6)),
+      ].join(",")
+    );
+    return [header, ...rows].join("\n");
+  }
+
+  async function copyTleRv() {
+    if (!state.tleSamples.length) return;
+    await copyText(
+      tleRvCsv(),
+      "已复制地固系 RV 数据（" + state.tleSamples.length + " 行）"
+    );
   }
 
   function savedNoradGroups(data) {
@@ -1342,6 +1367,18 @@
     });
   }
 
+  function initWalleText() {
+    const text = $("#walleText");
+    if (!text) return;
+    const randomColor = () =>
+      "hsl(" + Math.floor(Math.random() * 360) + ", 90%, 65%)";
+    text.style.color = randomColor();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    window.setInterval(() => {
+      text.style.color = randomColor();
+    }, 3000);
+  }
+
   function initWalle() {
     const robot = $(".walle");
     const actor = $(".walle-actor");
@@ -1650,6 +1687,9 @@
     $$(".home-shortcut").forEach((button) => {
       button.addEventListener("click", () => switchPage(button.dataset.go));
     });
+    $("#dataWarningClose").addEventListener("click", () => {
+      $("#dataWarning").classList.add("hidden");
+    });
     $("#runSimulation").addEventListener("click", runSimulation);
     $("#stopSimulation").addEventListener("click", stopSimulation);
     $("#profileSelect").addEventListener("change", updateProfileNote);
@@ -1663,6 +1703,7 @@
       if (content) copyText(content, "已复制平根参数");
     });
     $("#tleForm").addEventListener("submit", submitTle);
+    $("#copyTleRv").addEventListener("click", copyTleRv);
     $("#queryTle").addEventListener("click", queryTle);
     $("#saveNorad").addEventListener("click", saveNoradIds);
     $("#refreshRecentLaunches").addEventListener("click", () => loadRecentLaunches(true));
@@ -1687,6 +1728,7 @@
     bind();
     initDraggableLayout();
     initWalle();
+    initWalleText();
     const page = pageFromHash();
     switchPage(page, false);
     await loadInfo();

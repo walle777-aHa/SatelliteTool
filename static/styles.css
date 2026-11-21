@@ -109,12 +109,33 @@ main {
 }
 
 .data-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 28px;
   border-bottom: 1px solid rgba(244, 184, 96, 0.35);
   background: rgba(244, 184, 96, 0.08);
   color: var(--warning);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.data-warning-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--warning);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.data-warning-close:hover {
+  background: rgba(244, 184, 96, 0.18);
 }
 
 .page { display: none; }
@@ -396,6 +417,11 @@ canvas {
 
 .table-wrap { margin-top: 14px; overflow: auto; max-height: 320px; }
 
+/* TLE 递推结果默认显示 15 行数据 */
+[data-panel="tle-result"] .table-wrap {
+  max-height: 528px;
+}
+
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
 th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); font-weight: 600; }
@@ -607,6 +633,9 @@ td { color: #cfd9e5; }
   position: absolute;
   top: 0.09em;
   left: 0.12em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 0.54em;
   height: 0.18em;
   border-radius: 0.03em;
@@ -614,6 +643,16 @@ td { color: #cfd9e5; }
   box-shadow:
     inset 0 0 0 0.01em rgba(255, 255, 255, 0.08),
     0 0 0.05em rgba(0, 0, 0, 0.35);
+}
+
+.walle-text {
+  font-size: 0.1em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #7fe7dc;
+  text-shadow: 0 0 0.06em currentColor;
+  transition: color 0.4s linear;
 }
 
 .walle-panel::before,
@@ -628,8 +667,8 @@ td { color: #cfd9e5; }
   box-shadow: 0 0 0.04em #61d995;
 }
 
-.walle-panel::before { left: 0.06em; }
-.walle-panel::after { left: 0.13em; background: #f4b860; box-shadow: 0 0 0.04em #f4b860; }
+.walle-panel::before { left: auto; right: 0.13em; }
+.walle-panel::after { left: auto; right: 0.06em; background: #f4b860; box-shadow: 0 0 0.04em #f4b860; }
 
 .walle-arm {
   position: absolute;
@@ -868,7 +907,7 @@ td { color: #cfd9e5; }
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 460px;
+  max-height: 672px;
   overflow: auto;
 }
 

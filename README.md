@@ -55,7 +55,8 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
 - **仿真**：选择场景、仿真时长和 CSV 配置，运行 `BlueSpace.exe`；
   预览表显示前 20 行，曲线对完整数据流式降采样；
 - **轨道转换**：调用 `ApsOrbitTool.exe`，结果按输入表单展示，支持一键复制平根；
-- **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度；
+- **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度，结果表支持
+  一键复制 CSV 数据；
 - **TLE 查询**：Celestrak 查询最多 10 个 NORAD ID，结果按行展示，支持单行/全部
   复制；左侧保存列表支持保存、添加和删除本地 NORAD ID，并按 GCAT 国家代码
   分为中国/国外两列；左侧同时显示最近 30 天内最新一个发射日的载荷；
@@ -183,7 +184,8 @@ SatelliteTool/
 ### TLE 递推
 
 输入两行 TLE、递推天数、步长和输出间隔，调用 `Sgp4EcefTool.exe`。采样点数量
-受 `limits.max_sgp4_samples` 限制。
+受 `limits.max_sgp4_samples` 限制。结果表默认显示 15 行数据，可点击
+“复制数据”把全部采样点（含表头）复制为 CSV。
 
 ### TLE 查询
 

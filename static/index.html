@@ -29,7 +29,10 @@
     </div>
   </header>
 
-  <div id="dataWarning" class="data-warning hidden" role="status" aria-live="polite"></div>
+  <div id="dataWarning" class="data-warning hidden" role="status" aria-live="polite">
+    <span id="dataWarningText"></span>
+    <button class="data-warning-close" id="dataWarningClose" type="button" aria-label="关闭提示" title="关闭">×</button>
+  </div>
 
   <main>
     <section id="page-home" class="page home-page active">
@@ -43,7 +46,7 @@
             </div>
             <div class="walle-neck"></div>
             <div class="walle-body">
-              <span class="walle-panel"></span>
+              <span class="walle-panel"><span class="walle-text" id="walleText">Hello</span></span>
             </div>
             <div class="walle-arm walle-arm-left"></div>
             <div class="walle-arm walle-arm-right"></div>
@@ -265,6 +268,7 @@
         <div class="panel" data-panel="tle-result">
           <div class="panel-head">
             <div class="panel-title">地固系 RV</div>
+            <button class="btn ghost" id="copyTleRv" type="button" disabled>复制数据</button>
           </div>
           <pre id="tleMeta" class="console">等待输入...</pre>
           <div class="table-wrap">

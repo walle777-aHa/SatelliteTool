@@ -27,7 +27,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -312,6 +312,601 @@ def list_profiles() -> List[Dict[str, Any]]:
                     {"name": path.stem, "description": "配置错误: %s" % error, "columns": 0}
                 )
     return items
+
+
+def spacecraft_config_path(name: str) -> Path:
+    if not NAME_RE.fullmatch(name):
+        raise ApiError(400, "航天器配置名必须是字母、数字、点、下划线或连字符")
+    path = config_root() / "spacecraft" / (name + ".json")
+    if not path.is_file():
+        raise ApiError(404, "找不到航天器配置文件: %s" % path.name)
+    return path
+
+
+def _vector3(value: Any, default: Optional[List[float]] = None) -> List[float]:
+    if isinstance(value, list) and len(value) >= 3:
+        try:
+            return [float(value[0]), float(value[1]), float(value[2])]
+        except (TypeError, ValueError):
+            pass
+    return list(default) if default is not None else [0.0, 0.0, 0.0]
+
+
+def _matrix3(value: Any) -> List[List[float]]:
+    identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    if not isinstance(value, list) or len(value) != 3:
+        return identity
+    rows: List[List[float]] = []
+    for row in value:
+        if not isinstance(row, list) or len(row) != 3:
+            return identity
+        try:
+            rows.append([float(row[0]), float(row[1]), float(row[2])])
+        except (TypeError, ValueError):
+            return identity
+    return rows
+
+
+def _quat_dcm(value: Any) -> List[List[float]]:
+    identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    if not isinstance(value, list) or len(value) < 4:
+        return identity
+    try:
+        w, x, y, z = (float(value[0]), float(value[1]), float(value[2]), float(value[3]))
+    except (TypeError, ValueError):
+        return identity
+    norm = math.sqrt(w * w + x * x + y * y + z * z)
+    if norm < 1e-12:
+        return identity
+    w, x, y, z = w / norm, x / norm, y / norm, z / norm
+    return [
+        [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+        [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+        [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)],
+    ]
+
+
+def _surface_point(direction: List[float], half: List[float]) -> List[float]:
+    scale: Optional[float] = None
+    for component, extent in zip(direction, half):
+        if abs(component) < 1e-9:
+            continue
+        candidate = extent / abs(component)
+        if scale is None or candidate < scale:
+            scale = candidate
+    if scale is None:
+        return [0.0, 0.0, 0.0]
+    return [direction[0] * scale, direction[1] * scale, direction[2] * scale]
+
+
+def _text(value: Any) -> str:
+    if isinstance(value, list):
+        return "[" + ", ".join(_text(item) for item in value) + "]"
+    if isinstance(value, float):
+        return format(value, ".6g")
+    if value is None:
+        return "-"
+    return str(value)
+
+
+def derive_spacecraft_model(
+    config: Dict[str, Any], name: str, expand: Optional[bool] = None
+) -> Dict[str, Any]:
+    """Derive a schematic 3D structure from a BlueSpace spacecraft config."""
+    dyn = config.get("DynInfo") if isinstance(config.get("DynInfo"), dict) else {}
+    module = config.get("SatModule") if isinstance(config.get("SatModule"), dict) else {}
+    mass_pro = module.get("MassPro") if isinstance(module.get("MassPro"), dict) else {}
+    body = mass_pro.get("SatBody") if isinstance(mass_pro.get("SatBody"), dict) else {}
+
+    flags_raw = module.get("ModuleExpandFlag")
+    flag_names = module.get("ModuleExpandFlagName")
+    expand_flags: List[Dict[str, Any]] = []
+    if isinstance(flags_raw, list):
+        for index, value in enumerate(flags_raw):
+            label = (
+                str(flag_names[index])
+                if isinstance(flag_names, list) and index < len(flag_names)
+                else "机构%d" % (index + 1)
+            )
+            enabled = bool(value)
+            if expand is not None and index in (0, 1):
+                enabled = bool(expand)
+            expand_flags.append({"index": index, "name": label, "expanded": enabled})
+
+    def flag_enabled(value: Any) -> bool:
+        try:
+            position = int(value)
+        except (TypeError, ValueError):
+            return True
+        if 0 <= position < len(expand_flags):
+            return bool(expand_flags[position]["expanded"])
+        return True
+
+    body_mass = body.get("ExpandMass")
+    nodes: List[Dict[str, Any]] = [
+        {
+            "id": 1,
+            "name": str(body.get("NodeName") or "卫星本体"),
+            "parent": None,
+            "kind": "body",
+            "position": [0.0, 0.0, 0.0],
+            "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            "size": [1.6, 1.2, 1.2],
+            "color": "#d9a441",
+            "opacity": 0.55,
+            "mass_kg": float(body_mass) if isinstance(body_mass, (int, float)) else None,
+            "mass_center": _vector3(body.get("ExpandMassCenter")),
+        }
+    ]
+
+    part_list = mass_pro.get("ChildPartLst")
+    if isinstance(part_list, list):
+        parts = [part for part in part_list if isinstance(part, dict)]
+
+        def part_block(part: Dict[str, Any]) -> Any:
+            return (
+                part.get("Expand")
+                if flag_enabled(part.get("ModuleFlagIdx"))
+                else part.get("Collapse")
+            )
+
+        for part in parts:
+            node_name = str(part.get("NodeName") or "")
+            block = part_block(part)
+            if not isinstance(block, dict):
+                continue
+            mass = block.get("Mass")
+            if not isinstance(mass, (int, float)) or float(mass) <= 0:
+                continue
+            if "太阳翼" in node_name:
+                dcm = _matrix3(block.get("RotateDcm"))
+                connect = _vector3(block.get("ConnectPoint"))
+                # 翼面从连接点沿翼面法向（局部 X）向外展开
+                half_length = 4.3 / 2.0
+                position = [connect[0] + half_length, connect[1], connect[2]]
+                nodes.append(
+                    {
+                        "id": int(part.get("ID") or 0),
+                        "name": node_name,
+                        "parent": int(part.get("ParentID") or 1),
+                        "kind": "sunwing",
+                        "position": position,
+                        "dcm": dcm,
+                        "size": [4.3, 2.1, 0.06],
+                        "color": "#2f6fb0",
+                        "mass_kg": float(mass),
+                        "mass_center": _vector3(block.get("MassCenter")),
+                        "connect_point": connect,
+                        "module_flag_idx": part.get("ModuleFlagIdx"),
+                    }
+                )
+            elif "连杆" in node_name:
+                dcm = _matrix3(block.get("RotateDcm"))
+                connect = _vector3(block.get("ConnectPoint"))
+                link_id = int(part.get("ID") or 0)
+                wing = next(
+                    (
+                        item
+                        for item in parts
+                        if int(item.get("ParentID") or -1) == link_id
+                        and "太阳翼" in str(item.get("NodeName") or "")
+                    ),
+                    None,
+                )
+                if wing is not None:
+                    wing_block = part_block(wing)
+                    wing_connect = (
+                        _vector3(wing_block.get("ConnectPoint"))
+                        if isinstance(wing_block, dict)
+                        else [0.0, 0.0, 0.0]
+                    )
+                    attach = [
+                        connect[0]
+                        + dcm[0][0] * wing_connect[0]
+                        + dcm[0][1] * wing_connect[1]
+                        + dcm[0][2] * wing_connect[2],
+                        connect[1]
+                        + dcm[1][0] * wing_connect[0]
+                        + dcm[1][1] * wing_connect[1]
+                        + dcm[1][2] * wing_connect[2],
+                        connect[2]
+                        + dcm[2][0] * wing_connect[0]
+                        + dcm[2][1] * wing_connect[1]
+                        + dcm[2][2] * wing_connect[2],
+                    ]
+                    # 连杆向帆板方向再延伸 0.15 m，保证与帆板无缝衔接
+                    axis = [dcm[0][0], dcm[1][0], dcm[2][0]]
+                    attach = [
+                        attach[0] + axis[0] * 0.15,
+                        attach[1] + axis[1] * 0.15,
+                        attach[2] + axis[2] * 0.15,
+                    ]
+                    length = math.sqrt(
+                        (attach[0] - connect[0]) ** 2
+                        + (attach[1] - connect[1]) ** 2
+                        + (attach[2] - connect[2]) ** 2
+                    )
+                    if length < 1e-6:
+                        length = 2.0
+                    position = [
+                        (connect[0] + attach[0]) / 2.0,
+                        (connect[1] + attach[1]) / 2.0,
+                        (connect[2] + attach[2]) / 2.0,
+                    ]
+                    size = [length, 0.2, 0.2]
+                else:
+                    position = _vector3(block.get("MassCenter"))
+                    size = [2.5, 0.2, 0.2]
+                nodes.append(
+                    {
+                        "id": link_id,
+                        "name": node_name,
+                        "parent": int(part.get("ParentID") or 1),
+                        "kind": "link",
+                        "position": position,
+                        "dcm": dcm,
+                        "size": size,
+                        "color": "#5c6670",
+                        "mass_kg": float(mass),
+                        "connect_point": connect,
+                        "module_flag_idx": part.get("ModuleFlagIdx"),
+                    }
+                )
+
+    gizmo_id = 900
+    body_half = [0.8, 0.6, 0.6]
+
+    def add_gizmo(
+        kind: str,
+        node_name: str,
+        position: List[float],
+        size: Optional[List[float]],
+        color: str,
+        direction: Optional[List[float]] = None,
+        parent: int = 1,
+        dcm: Optional[List[List[float]]] = None,
+        shape: str = "box",
+        radius: Optional[float] = None,
+        height: Optional[float] = None,
+    ) -> int:
+        nonlocal gizmo_id
+        gizmo_id += 1
+        gizmo: Dict[str, Any] = {
+            "id": gizmo_id,
+            "name": node_name,
+            "parent": parent,
+            "kind": kind,
+            "position": position,
+            "dcm": dcm if dcm is not None else [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            "shape": shape,
+            "size": size,
+            "color": color,
+            "mass_kg": None,
+        }
+        if direction is not None:
+            gizmo["direction"] = direction
+        if radius is not None:
+            gizmo["radius"] = radius
+        if height is not None:
+            gizmo["height"] = height
+        nodes.append(gizmo)
+        return gizmo_id
+
+    stars = config.get("Star")
+    if isinstance(stars, list):
+        for star in stars:
+            if not isinstance(star, dict):
+                continue
+            dcm = _quat_dcm(star.get("PosQbs"))
+            boresight = [dcm[0][2], dcm[1][2], dcm[2][2]]
+            position = _surface_point(boresight, body_half)
+            base_id = add_gizmo(
+                "star-base",
+                "星敏",
+                position,
+                [0.12, 0.12, 0.16],
+                "#5a6470",
+                parent=1,
+                dcm=dcm,
+            )
+            add_gizmo(
+                "star-cone",
+                "星敏遮光罩",
+                [0.0, 0.0, 0.14],
+                None,
+                "#7d8aa0",
+                parent=base_id,
+                shape="cone",
+                radius=0.07,
+                height=0.12,
+            )
+
+    engines = config.get("Engine")
+    if isinstance(engines, list):
+        for engine in engines:
+            if not isinstance(engine, dict):
+                continue
+            direction = _vector3(engine.get("EngineDirectionM"), [1.0, 0.0, 0.0])
+            norm = math.sqrt(direction[0] ** 2 + direction[1] ** 2 + direction[2] ** 2)
+            if norm < 1e-9:
+                direction = [1.0, 0.0, 0.0]
+            else:
+                direction = [direction[0] / norm, direction[1] / norm, direction[2] / norm]
+            axis = max(range(3), key=lambda index: abs(direction[index]))
+            sign = 1.0 if direction[axis] >= 0 else -1.0
+            position = _vector3(engine.get("InstallPointM"))
+            for index in range(3):
+                if index != axis:
+                    position[index] = max(-body_half[index], min(body_half[index], position[index]))
+            half_size = 0.175
+            position[axis] = -sign * (body_half[axis] + 0.05 + half_size)
+            add_gizmo(
+                "engine",
+                "发动机",
+                position,
+                [0.35, 0.35, 0.35],
+                "#c0392b",
+                direction=direction,
+            )
+    wheels = config.get("Wheel")
+    if isinstance(wheels, list):
+        for wheel in wheels:
+            if isinstance(wheel, dict):
+                position = _vector3(wheel.get("PosVetB"))
+                position[2] = max(-0.54, min(0.54, position[2]))
+                add_gizmo(
+                    "wheel",
+                    "动量轮",
+                    position,
+                    None,
+                    "#8e9aa8",
+                    shape="cylinder",
+                    radius=0.16,
+                    height=0.12,
+                )
+
+    info: List[Dict[str, str]] = []
+
+    def add_info(label: str, value: Any) -> None:
+        info.append({"label": label, "value": _text(value)})
+
+    add_info("卫星名称", dyn.get("SateName"))
+    add_info("系列", dyn.get("SeriesName"))
+    add_info("总质量 (kg)", module.get("Mass"))
+    add_info("本体质量 (kg)", body.get("ExpandMass"))
+    add_info("本体质心 (m)", body.get("ExpandMassCenter"))
+    orbit = config.get("OrbitInit")
+    if isinstance(orbit, dict):
+        orbit_value = orbit.get("OrbitValue")
+        if isinstance(orbit_value, list) and len(orbit_value) >= 6:
+            try:
+                a_km = float(orbit_value[0]) / 1000.0
+                add_info(
+                    "轨道六根数",
+                    "a=%.3f km, e=%g, i=%.4f°, Ω=%g°, ω=%g°, M=%g°"
+                    % (
+                        a_km,
+                        float(orbit_value[1]),
+                        float(orbit_value[2]),
+                        float(orbit_value[3]),
+                        float(orbit_value[4]),
+                        float(orbit_value[5]),
+                    ),
+                )
+            except (TypeError, ValueError):
+                pass
+    for node in nodes:
+        if node["kind"] == "sunwing":
+            add_info(node["name"] + " 质量 (kg)", node["mass_kg"])
+            add_info(node["name"] + " 质心 (m)", node.get("mass_center"))
+            add_info(node["name"] + " 连接点 (m)", node.get("connect_point"))
+    for engine_node in [item for item in nodes if item["kind"] == "engine"]:
+        add_info("发动机安装点 (m)", engine_node["position"])
+        add_info("发动机方向", engine_node.get("direction"))
+    star_count = len([item for item in nodes if item["kind"] == "star-base"])
+    wheel_count = len([item for item in nodes if item["kind"] == "wheel"])
+    if star_count:
+        add_info("星敏数量", star_count)
+    if wheel_count:
+        add_info("飞轮数量", wheel_count)
+    add_info(
+        "机构状态",
+        "；".join(
+            "%s=%s" % (item["name"], "展开" if item["expanded"] else "收拢")
+            for item in expand_flags
+        ),
+    )
+
+    return {
+        "name": name,
+        "sate_name": str(dyn.get("SateName") or name),
+        "series": str(dyn.get("SeriesName") or ""),
+        "mass_kg": float(module["Mass"]) if isinstance(module.get("Mass"), (int, float)) else None,
+        "expand_flags": expand_flags,
+        "nodes": nodes,
+        "info": info,
+        "source": "runtime/cfg/spacecraft/%s.json" % name,
+    }
+
+
+def read_spacecraft_model(name: str, expand: Optional[bool] = None) -> Dict[str, Any]:
+    path = spacecraft_config_path(name)
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ApiError(500, "航天器配置读取失败: %s" % error)
+    if not isinstance(config, dict):
+        raise ApiError(500, "航天器配置必须是 JSON 对象")
+    return derive_spacecraft_model(config, name, expand)
+
+
+def derive_starlink_v3_model(expand: Optional[bool] = None) -> Dict[str, Any]:
+    """Build an explicitly schematic Starlink V3-inspired visual model.
+
+    SpaceX has not published an engineering drawing or full satellite envelope.
+    The geometry below is for visualization only; it is not used by simulation.
+    """
+    wings_expanded = True if expand is None else bool(expand)
+    nodes: List[Dict[str, Any]] = [
+        {
+            "id": 1,
+            "name": "Starlink V3 卫星平台（示意）",
+            "parent": None,
+            "kind": "body",
+            "position": [0.0, 0.0, 0.0],
+            "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            "size": [3.6, 2.4, 1.35],
+            "color": "#929da7",
+            "mass_kg": None,
+        }
+    ]
+
+    # Public imagery/features indicate long dual arrays, but exact deployed
+    # dimensions have not been disclosed. 19 m is used as an illustrative
+    # blanket-section scale, not a confirmed full-array dimension.
+    wing_length = 19.0 if wings_expanded else 2.8
+    wing_center = 1.2 + wing_length / 2.0
+    for side, sign in (("+Y", 1.0), ("-Y", -1.0)):
+        nodes.append(
+            {
+                "id": 10 if sign > 0 else 20,
+                "name": side + " 太阳翼",
+                "parent": 1,
+                "kind": "solar-array",
+                "position": [0.0, sign * wing_center, 0.0],
+                "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                "size": [3.2, wing_length, 0.08],
+                "color": "#174a78",
+                "mass_kg": None,
+            }
+        )
+        # Structural yoke between the bus and each deployed array.
+        nodes.append(
+            {
+                "id": 11 if sign > 0 else 21,
+                "name": side + " 翼根支架",
+                "parent": 1,
+                "kind": "link",
+                "position": [0.0, sign * 1.3, 0.0],
+                "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                "size": [2.0, 0.22, 0.22],
+                "color": "#57636d",
+                "mass_kg": None,
+            }
+        )
+
+    # Phased-array faces on the bus. Count and placement are illustrative.
+    for index, x in enumerate((-1.2, -0.6, 0.0, 0.6, 1.2)):
+        nodes.append(
+            {
+                "id": 100 + index,
+                "name": "相控阵面 %d" % (index + 1),
+                "parent": 1,
+                "kind": "phased-array",
+                "position": [x, 0.0, 0.71],
+                "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                "size": [0.48, 0.78, 0.06],
+                "color": "#c9d4dc",
+                "mass_kg": None,
+            }
+        )
+
+    # SpaceX describes four quad-band RF backhaul antennas. Placement is schematic.
+    for index, position in enumerate(
+        (
+            [-1.65, -0.65, 0.0],
+            [-1.65, 0.65, 0.0],
+            [1.65, -0.65, 0.0],
+            [1.65, 0.65, 0.0],
+        )
+    ):
+        nodes.append(
+            {
+                "id": 150 + index,
+                "name": "四频段 RF 回传天线（示意）",
+                "parent": 1,
+                "kind": "rf-backhaul",
+                "position": position,
+                "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                "size": [0.2, 0.42, 0.42],
+                "color": "#d5a84c",
+                "mass_kg": None,
+            }
+        )
+
+    # SpaceX states six 400-Gbps optical inter-satellite terminals.
+    # Their exact physical placement is not publicly documented.
+    terminal_positions = [
+        [-1.55, -0.9, 0.0],
+        [-1.55, 0.9, 0.0],
+        [1.55, -0.9, 0.0],
+        [1.55, 0.9, 0.0],
+        [0.0, -0.95, -0.62],
+        [0.0, 0.95, -0.62],
+    ]
+    for index, position in enumerate(terminal_positions):
+        nodes.append(
+            {
+                "id": 200 + index,
+                "name": "光学星间链路端口（示意）",
+                "parent": 1,
+                "kind": "optical-terminal",
+                "position": position,
+                "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                "shape": "cylinder",
+                "radius": 0.16,
+                "height": 0.18,
+                "size": None,
+                "color": "#5bc0eb",
+                "mass_kg": None,
+            }
+        )
+
+    # Generic propulsion units on the aft side, not a disclosed V3 layout.
+    for index, position in enumerate(
+        ([-1.15, -0.7, -0.72], [1.15, -0.7, -0.72], [-1.15, 0.7, -0.72], [1.15, 0.7, -0.72])
+    ):
+        nodes.append(
+            {
+                "id": 300 + index,
+                "name": "推进组件（示意）",
+                "parent": 1,
+                "kind": "thruster",
+                "position": position,
+                "dcm": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                "shape": "cylinder",
+                "radius": 0.22,
+                "height": 0.38,
+                "size": None,
+                "color": "#b86b4b",
+                "mass_kg": None,
+            }
+        )
+
+    info = [
+        {"label": "原型", "value": "Starlink V3（概念示意）"},
+        {"label": "下行容量", "value": ">1 Tbps/星（SpaceX 目标）"},
+        {"label": "上行容量", "value": ">200 Gbps/星（SpaceX 2025 目标）"},
+        {"label": "波束", "value": "2048 下行 + 2048 上行（SpaceX 公布）"},
+        {"label": "光学星间链路", "value": "6 × 400 Gbps（SpaceX 公布）"},
+        {"label": "RF 回传", "value": "4 个四频段天线；V3 容量目标约 1.2 Tbps"},
+        {"label": "太阳翼", "value": "双阵列；发电量目标约为 V2 的 2 倍"},
+        {"label": "太阳翼比例", "value": "展示采用约 19 m 毯段尺度，非官方整翼尺寸"},
+        {"label": "质量与外形", "value": "V3 官方完整质量、机械图和外形尺寸未公开"},
+        {"label": "模型说明", "value": "视觉原型，不代表 Starlink V3 实际工程图或仿真参数"},
+    ]
+    return {
+        "name": "starlink-v3-concept",
+        "sate_name": "Starlink V3 概念模型",
+        "series": "Starlink V3",
+        "mass_kg": None,
+        "summary": "Starlink V3 概念示意 · 尺寸非官方",
+        "expand_flags": [{"index": 0, "name": "太阳翼", "expanded": wings_expanded}],
+        "nodes": nodes,
+        "info": info,
+        "source": "https://starlink.com/updates/starlink-version-3-satellites",
+        "source_note": "公开能力参数来自 Starlink V3 更新；几何尺寸与部件布局为概念示意。",
+    }
 
 
 def load_profile(name: str) -> Dict[str, Any]:
@@ -1751,6 +2346,477 @@ def orbit_convert(body: Dict[str, Any]) -> Dict[str, Any]:
     raise ApiError(400, "mode 必须是 rv2el 或 el2rv")
 
 
+BDT_EPOCH = datetime(2006, 1, 1)
+BDT_UTC_OFFSET_S = 4
+BDT_WEEK_S = 604800.0
+EARTH_MU_SI = 3986004.418e8
+RVT_SAMPLE_COUNT = 60
+RVT_INTERVAL_S = 60.0
+EPH18_NAMES = [
+    "a",
+    "e",
+    "i0",
+    "Omega0",
+    "omega",
+    "M0",
+    "delta_n0",
+    "Omega_dot",
+    "i0_dot",
+    "Cus",
+    "Cuc",
+    "Cis",
+    "Cic",
+    "Crs",
+    "Crc",
+    "A_dot",
+    "delta_n0_dot",
+    "toe",
+]
+EPH18_UNITS = [
+    "m",
+    "1",
+    "rad",
+    "rad",
+    "rad",
+    "rad",
+    "rad/s",
+    "rad/s",
+    "rad/s",
+    "rad",
+    "rad",
+    "rad",
+    "rad",
+    "m",
+    "m",
+    "m/s",
+    "rad/s²",
+    "s (BDT 周内秒)",
+]
+
+
+def _parse_utc_datetime(value: Any) -> datetime:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ApiError(400, "start_utc 必须填写 UTC 起始时间")
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        raise ApiError(400, "start_utc 应为 ISO 时间，例如 2024-09-01T03:00:00Z")
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _utc_to_bdt_week_sow(value: Any) -> Tuple[int, float]:
+    utc = _parse_utc_datetime(value)
+    bdt = utc + timedelta(seconds=BDT_UTC_OFFSET_S)
+    elapsed = (bdt - BDT_EPOCH).total_seconds()
+    if elapsed < 0:
+        raise ApiError(400, "起始 UTC 时间必须不早于 BDT 历元 2006-01-01")
+    week = int(math.floor(elapsed / BDT_WEEK_S))
+    return week, elapsed - week * BDT_WEEK_S
+
+
+def _solve_kepler(e: float, mean_anomaly: float) -> float:
+    mean = mean_anomaly % (2.0 * math.pi)
+    eccentric = mean if e < 0.8 else math.pi
+    for _ in range(50):
+        residual = eccentric - e * math.sin(eccentric) - mean
+        derivative = 1.0 - e * math.cos(eccentric)
+        step = residual / derivative
+        eccentric -= step
+        if abs(step) < 1e-13:
+            return eccentric
+    raise ApiError(400, "Kepler 方程未能收敛，请检查偏心率和参数")
+
+
+def _rv_to_18_initial(r: List[float], v: List[float]) -> List[float]:
+    rmag = _vec_norm(r)
+    vmag = _vec_norm(v)
+    if rmag <= 1.0 or vmag <= 1e-9:
+        raise ApiError(400, "RVT 位置/速度模长无效")
+    h = _vec_cross(r, v)
+    hmag = _vec_norm(h)
+    if hmag <= 1e-6:
+        raise ApiError(400, "RVT 角动量接近 0，无法拟合轨道")
+    energy = 2.0 / rmag - vmag * vmag / EARTH_MU_SI
+    if energy <= 0:
+        raise ApiError(400, "18 参数模型仅支持负能量椭圆轨道")
+    a = 1.0 / energy
+    inclination = math.atan2(math.hypot(h[0], h[1]), h[2])
+    omega0 = math.atan2(h[0], -h[1]) % (2.0 * math.pi)
+    arg_lat = math.atan2(
+        r[2] * hmag,
+        -r[0] * h[1] + r[1] * h[0],
+    ) % (2.0 * math.pi)
+    e_cos_e = 1.0 - rmag / a
+    e_sin_e = _vec_dot(r, v) / math.sqrt(EARTH_MU_SI * a)
+    eccentricity = math.hypot(e_cos_e, e_sin_e)
+    if not 0 <= eccentricity < 1:
+        raise ApiError(400, "18 参数模型要求偏心率满足 0 ≤ e < 1")
+    eccentric_anomaly = math.atan2(e_sin_e, e_cos_e)
+    mean_anomaly = (eccentric_anomaly - e_sin_e) % (2.0 * math.pi)
+    true_anomaly = math.atan2(
+        math.sqrt(max(0.0, 1.0 - eccentricity**2)) * e_sin_e,
+        e_cos_e - eccentricity**2,
+    ) % (2.0 * math.pi)
+    arg_perigee = (arg_lat - true_anomaly) % (2.0 * math.pi)
+    return [
+        a,
+        eccentricity,
+        inclination,
+        omega0,
+        arg_perigee,
+        mean_anomaly,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+
+
+def _cal_18_state(p: List[float], tk: float) -> Tuple[List[float], List[float], List[List[float]]]:
+    """Evaluate the ** 18-parameter position, velocity and position Jacobian."""
+    a0, eccentricity = p[0], p[1]
+    if a0 <= 0 or not 0 <= eccentricity < 1:
+        raise ApiError(400, "18 参数需要 a > 0 且 0 ≤ e < 1")
+    if not all(math.isfinite(value) for value in p):
+        raise ApiError(400, "18 参数必须为有限数值")
+
+    inclination0, omega0, arg_perigee0, mean0 = p[2], p[3], p[4], p[5]
+    delta_n, omega_dot, inclination_dot = p[6], p[7], p[8]
+    cus, cuc, cis, cic, crs, crc = p[9:15]
+    a_dot, delta_n_dot = p[15], p[16]
+
+    a = a0 + a_dot * tk
+    if a <= 0:
+        raise ApiError(400, "该时刻半长轴非正，参数无效")
+    n_base = math.sqrt(EARTH_MU_SI / (a0**3))
+    n_mean = n_base + delta_n + 0.5 * delta_n_dot * tk
+    mean = mean0 + n_mean * tk
+    eccentric_anomaly = _solve_kepler(eccentricity, mean)
+    sin_e, cos_e = math.sin(eccentric_anomaly), math.cos(eccentric_anomaly)
+    true_anomaly = 2.0 * math.atan2(
+        math.sqrt(1.0 + eccentricity) * math.sin(eccentric_anomaly / 2.0),
+        math.sqrt(1.0 - eccentricity) * math.cos(eccentric_anomaly / 2.0),
+    )
+    phi = true_anomaly + arg_perigee0
+    sin_2phi, cos_2phi = math.sin(2.0 * phi), math.cos(2.0 * phi)
+
+    delta_u = cus * sin_2phi + cuc * cos_2phi
+    delta_r = crs * sin_2phi + crc * cos_2phi
+    delta_i = cis * sin_2phi + cic * cos_2phi
+    u = phi + delta_u
+    radius = a * (1.0 - eccentricity * cos_e) + delta_r
+    inclination = inclination0 + inclination_dot * tk + delta_i
+    omega = omega0 + omega_dot * tk
+
+    cu, su = math.cos(u), math.sin(u)
+    ci, si = math.cos(inclination), math.sin(inclination)
+    co, so = math.cos(omega), math.sin(omega)
+    position = [
+        radius * cu * co - radius * su * ci * so,
+        radius * cu * so + radius * su * ci * co,
+        radius * su * si,
+    ]
+
+    denominator = 1.0 - eccentricity * cos_e
+    if abs(denominator) < 1e-12:
+        raise ApiError(400, "轨道近地点奇异，无法计算速度")
+    e_dot = (n_mean + 0.5 * delta_n_dot * tk) / denominator
+    phi_dot = math.sqrt(1.0 - eccentricity**2) * e_dot / denominator
+    u_dot = (1.0 + 2.0 * cus * cos_2phi - 2.0 * cuc * sin_2phi) * phi_dot
+    r_dot = (
+        2.0 * (crs * cos_2phi - crc * sin_2phi) * phi_dot
+        + a_dot * denominator
+        + a * eccentricity * sin_e * e_dot
+    )
+    i_dot = 2.0 * (cis * cos_2phi - cic * sin_2phi) * phi_dot + inclination_dot
+    y = radius * su
+    x_dot = r_dot * cu - radius * su * u_dot
+    y_dot = r_dot * su + radius * cu * u_dot
+    velocity = [
+        x_dot * co - position[1] * omega_dot - (y_dot * ci - position[2] * i_dot) * so,
+        x_dot * so + position[0] * omega_dot + (y_dot * ci - position[2] * i_dot) * co,
+        y_dot * si + y * ci * i_dot,
+    ]
+
+    # Position partial derivatives, following Fun_cal_all_point.m column order.
+    p_over_a = [value / a for value in position]
+    p_over_a_dot = [tk * value for value in p_over_a]
+    p_over_omega = [
+        -radius * cu * so - radius * su * ci * co,
+        radius * cu * co - radius * su * ci * so,
+        0.0,
+    ]
+    p_over_i = [radius * su * si * so, -radius * su * si * co, radius * su * ci]
+    p_over_u = [
+        -radius * su * co - radius * cu * ci * so,
+        -radius * su * so + radius * cu * ci * co,
+        radius * cu * si,
+    ]
+    p_over_r = [cu * co - su * ci * so, cu * so + su * ci * co, su * si]
+    p_over_e = [
+        -a * (cos_e + eccentricity) / (a * (1.0 - eccentricity**2)) * position[k]
+        + sin_e * (1.0 + radius / (a * (1.0 - eccentricity**2))) / n_mean * velocity[k]
+        for k in range(3)
+    ]
+    p_over_m = [value / n_mean for value in velocity]
+
+    jacobian = [[0.0 for _ in range(17)] for _ in range(3)]
+    columns = [
+        p_over_a,
+        p_over_e,
+        p_over_i,
+        p_over_omega,
+        p_over_u,
+        p_over_m,
+        [tk * value for value in p_over_m],
+        [tk * value for value in p_over_omega],
+        [tk * value for value in p_over_i],
+        [sin_2phi * value for value in p_over_u],
+        [cos_2phi * value for value in p_over_u],
+        [sin_2phi * value for value in p_over_i],
+        [cos_2phi * value for value in p_over_i],
+        [sin_2phi * value for value in p_over_r],
+        [cos_2phi * value for value in p_over_r],
+        p_over_a_dot,
+        [0.5 * tk * tk * value / n_mean for value in velocity],
+    ]
+    for column, values in enumerate(columns):
+        for row in range(3):
+            jacobian[row][column] = values[row]
+    return position, velocity, jacobian
+
+
+def _solve_dense_linear(matrix: List[List[float]], rhs: List[float]) -> List[float]:
+    n = len(rhs)
+    a = [matrix[row][:] + [rhs[row]] for row in range(n)]
+    for col in range(n):
+        pivot = max(range(col, n), key=lambda row: abs(a[row][col]))
+        if abs(a[pivot][col]) < 1e-24:
+            raise ApiError(422, "18 参数拟合矩阵奇异；请检查轨道弧段或输入数据")
+        a[col], a[pivot] = a[pivot], a[col]
+        divisor = a[col][col]
+        for j in range(col, n + 1):
+            a[col][j] /= divisor
+        for row in range(n):
+            if row == col:
+                continue
+            factor = a[row][col]
+            if factor == 0.0:
+                continue
+            for j in range(col, n + 1):
+                a[row][j] -= factor * a[col][j]
+    return [a[row][n] for row in range(n)]
+
+
+def _fit_rvt_to_18(samples: List[Tuple[List[float], List[float]]], toe: float) -> Dict[str, Any]:
+    if len(samples) != RVT_SAMPLE_COUNT:
+        raise ApiError(400, "RVT 输入必须正好包含 60 组（每组间隔 1 分钟）")
+    params = _rv_to_18_initial(samples[0][0], samples[0][1])
+    scales = [
+        7.0e6,
+        1.0e-3,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0e-6,
+        1.0e-6,
+        1.0e-6,
+        1.0e-6,
+        1.0e-6,
+        1.0e-6,
+        1.0e-6,
+        100.0,
+        100.0,
+        1.0,
+        1.0e-10,
+    ]
+
+    def objective(p: List[float]) -> float:
+        total = 0.0
+        for index, (target, _velocity) in enumerate(samples):
+            predicted, _, _ = _cal_18_state(p, index * RVT_INTERVAL_S)
+            total += sum((target[k] - predicted[k]) ** 2 for k in range(3))
+        return total
+
+    current_error = objective(params)
+    converged = False
+    iterations = 0
+    for iterations in range(1, 31):
+        normal = [[0.0] * 17 for _ in range(17)]
+        gradient = [0.0] * 17
+        for index, (target, _velocity) in enumerate(samples):
+            predicted, _, jacobian = _cal_18_state(params, index * RVT_INTERVAL_S)
+            residual = [target[k] - predicted[k] for k in range(3)]
+            for row in range(3):
+                scaled = [jacobian[row][col] * scales[col] for col in range(17)]
+                for col in range(17):
+                    gradient[col] += scaled[col] * residual[row]
+                    for other in range(col, 17):
+                        normal[col][other] += scaled[col] * scaled[other]
+        for col in range(17):
+            for other in range(col):
+                normal[col][other] = normal[other][col]
+
+        accepted = False
+        step_size = 1.0
+        for _attempt in range(8):
+            damped = [row[:] for row in normal]
+            for col in range(17):
+                damped[col][col] += max(normal[col][col], 1e-12) * 1e-10
+            try:
+                normalized_step = _solve_dense_linear(damped, gradient)
+            except ApiError:
+                normalized_step = [0.0] * 17
+            candidate = [
+                params[col] + step_size * scales[col] * normalized_step[col] for col in range(17)
+            ]
+            if candidate[0] > 1.0 and 0.0 <= candidate[1] < 1.0:
+                try:
+                    candidate_error = objective(candidate)
+                except ApiError:
+                    candidate_error = math.inf
+                if candidate_error < current_error:
+                    params = candidate
+                    improvement = current_error - candidate_error
+                    current_error = candidate_error
+                    accepted = True
+                    if improvement <= max(1e-10, current_error * 1e-12):
+                        converged = True
+                    break
+            step_size *= 0.5
+        if not accepted:
+            converged = math.sqrt(current_error / len(samples)) <= 0.1
+            break
+        if converged:
+            break
+
+    rms = math.sqrt(current_error / len(samples))
+    values = params + [toe]
+    return {
+        "parameters": values,
+        "parameter_names": EPH18_NAMES,
+        "parameter_units": EPH18_UNITS,
+        "fit_error_rms_m": rms,
+        "iterations": iterations,
+        "converged": converged,
+    }
+
+
+def convert_rvt18(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert RVT and GNC 18-parameter ephemeris using pure Python.
+
+    This endpoint does not invoke MATLAB, MATLAB Runtime, or any external
+    MATLAB scripts; the orbital model and least-squares fit run in-process.
+    """
+    mode = str(body.get("mode", ""))
+    if mode not in ("rvt2eph", "eph2rvt"):
+        raise ApiError(400, "mode 必须是 rvt2eph 或 eph2rvt")
+    units = str(body.get("units", "km")).lower()
+    if units not in ("km", "m"):
+        raise ApiError(400, "units 必须是 km 或 m")
+    length_scale = 1000.0 if units == "km" else 1.0
+    velocity_scale = length_scale
+
+    if mode == "rvt2eph":
+        raw_samples = body.get("rvt")
+        if not isinstance(raw_samples, list) or len(raw_samples) != RVT_SAMPLE_COUNT:
+            raise ApiError(400, "RVT 输入必须正好包含 60 组数据")
+        raw_times = body.get("rvt_times_s")
+        if raw_times is not None:
+            if not isinstance(raw_times, list) or len(raw_times) != RVT_SAMPLE_COUNT:
+                raise ApiError(400, "RVT 时间列必须也包含 60 个值")
+            try:
+                sample_times = [float(value) for value in raw_times]
+            except (TypeError, ValueError):
+                raise ApiError(400, "RVT 时间列必须为数值秒")
+            if not all(math.isfinite(value) for value in sample_times):
+                raise ApiError(400, "RVT 时间列必须为有限数值")
+            if any(
+                abs((sample_times[index] - sample_times[index - 1]) - RVT_INTERVAL_S) > 0.5
+                for index in range(1, RVT_SAMPLE_COUNT)
+            ):
+                raise ApiError(400, "RVT 数据时间列必须严格按 60 秒间隔排列")
+        samples: List[Tuple[List[float], List[float]]] = []
+        for index, row in enumerate(raw_samples):
+            if not isinstance(row, (list, tuple)) or len(row) != 6:
+                raise ApiError(400, "第 %d 组必须包含 Rx,Ry,Rz,Vx,Vy,Vz 六个值" % (index + 1))
+            try:
+                values = [float(value) for value in row]
+            except (TypeError, ValueError):
+                raise ApiError(400, "第 %d 组 RVT 含非数字数据" % (index + 1))
+            if not all(math.isfinite(value) for value in values):
+                raise ApiError(400, "第 %d 组 RVT 含非有限数值" % (index + 1))
+            r = [value * length_scale for value in values[:3]]
+            v = [value * velocity_scale for value in values[3:]]
+            samples.append((r, v))
+        bdt_week, toe = _utc_to_bdt_week_sow(body.get("start_utc"))
+        fit = _fit_rvt_to_18(samples, toe)
+        return {
+            "mode": mode,
+            "bdt_week": bdt_week,
+            "start_utc": _parse_utc_datetime(body.get("start_utc")).isoformat() + "Z",
+            **fit,
+        }
+
+    raw_parameters = body.get("parameters")
+    if not isinstance(raw_parameters, list) or len(raw_parameters) != 18:
+        raise ApiError(400, "18 参数输入必须正好包含 18 个数值")
+    try:
+        parameters = [float(value) for value in raw_parameters]
+    except (TypeError, ValueError):
+        raise ApiError(400, "18 参数必须全部为数字")
+    if not all(math.isfinite(value) for value in parameters):
+        raise ApiError(400, "18 参数必须全部为有限数值")
+    if parameters[0] <= 0 or not 0 <= parameters[1] < 1:
+        raise ApiError(400, "18 参数要求 a > 0 且 0 ≤ e < 1")
+    if parameters[17] < 0 or parameters[17] >= BDT_WEEK_S:
+        raise ApiError(400, "第 18 参数 toe 必须是 0 至 604800 秒内的 BDT 周内秒")
+    try:
+        bdt_week = int(body.get("bdt_week"))
+    except (TypeError, ValueError):
+        raise ApiError(400, "BDT 周必须是非负整数")
+    if bdt_week < 0:
+        raise ApiError(400, "BDT 周必须是非负整数")
+
+    p = parameters[:17]
+    output = []
+    for index in range(RVT_SAMPLE_COUNT):
+        tk = index * RVT_INTERVAL_S
+        pos, vel, _ = _cal_18_state(p, tk)
+        if units == "km":
+            pos = [value / 1000.0 for value in pos]
+            vel = [value / 1000.0 for value in vel]
+        output.append(
+            {
+                "t_s": tk,
+                "r": pos,
+                "v": vel,
+            }
+        )
+    return {
+        "mode": mode,
+        "bdt_week": bdt_week,
+        "toe_sow": parameters[17],
+        "interval_s": RVT_INTERVAL_S,
+        "units": units,
+        "samples": output,
+        "count": len(output),
+    }
+
+
 def run_sgp4(body: Dict[str, Any]) -> Dict[str, Any]:
     line1 = str(body.get("line1", "")).strip()
     line2 = str(body.get("line2", "")).strip()
@@ -1930,6 +2996,24 @@ class Handler(BaseHTTPRequestHandler):
                 force = query.get("refresh", ["0"])[0].lower() in ("1", "true", "yes")
                 self.send_json(200, {"ok": True, **fetch_recent_launches(force=force)})
                 return
+            if path == "/api/spacecraft/model":
+                query = urllib.parse.parse_qs(parsed.query)
+                model = query.get("model", ["config"])[0].strip().lower()
+                name = query.get("name", ["star_001"])[0]
+                expand_raw = query.get("expand", [""])[0].strip().lower()
+                expand = (
+                    True
+                    if expand_raw in ("1", "true", "yes")
+                    else False if expand_raw in ("0", "false", "no") else None
+                )
+                if model == "starlink-v3":
+                    payload = derive_starlink_v3_model(expand)
+                elif model == "config":
+                    payload = read_spacecraft_model(name, expand)
+                else:
+                    raise ApiError(400, "model 必须是 config 或 starlink-v3")
+                self.send_json(200, {"ok": True, **payload})
+                return
             match = re.fullmatch(r"/api/jobs/([A-Za-z0-9_.-]+)/file", path)
             if match:
                 query = urllib.parse.parse_qs(parsed.query)
@@ -1961,6 +3045,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/orbit/convert":
                 self.send_json(200, {"ok": True, "result": orbit_convert(body)})
+                return
+            if path == "/api/rv18/convert":
+                self.send_json(200, {"ok": True, "result": convert_rvt18(body)})
                 return
             if path == "/api/sgp4":
                 self.send_json(200, run_sgp4(body))

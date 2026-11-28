@@ -379,6 +379,288 @@ class OrbitConvertTest(unittest.TestCase):
             app.rv_to_j2000_elements({"mode": "rv2el", "r_km": [7000, 0], "v_km_s": [0, 1, 0]})
 
 
+class Rvt18ConvertTest(unittest.TestCase):
+    PARAMETERS = [
+        7_000_000.0,
+        0.01,
+        0.9,
+        1.0,
+        0.5,
+        0.3,
+        1e-8,
+        -1e-7,
+        1e-9,
+        1e-6,
+        -2e-6,
+        3e-7,
+        -4e-7,
+        100.0,
+        50.0,
+        0.01,
+        1e-12,
+        100000.0,
+    ]
+
+    def test_18_parameters_generate_60_one_minute_rvt_samples(self):
+        result = app.convert_rvt18(
+            {
+                "mode": "eph2rvt",
+                "parameters": self.PARAMETERS,
+                "bdt_week": 974,
+                "units": "km",
+            }
+        )
+        self.assertEqual(result["count"], 60)
+        self.assertEqual(result["samples"][0]["t_s"], 0)
+        self.assertEqual(result["samples"][-1]["t_s"], 3540)
+        self.assertAlmostEqual(
+            result["samples"][0]["r"][0] * 1000,
+            -22823.7168795,
+            places=4,
+        )
+        self.assertEqual(result["units"], "km")
+
+    def test_rvt_to_18_roundtrip_fit(self):
+        generated = app.convert_rvt18(
+            {
+                "mode": "eph2rvt",
+                "parameters": self.PARAMETERS,
+                "bdt_week": 974,
+                "units": "m",
+            }
+        )
+        fit = app.convert_rvt18(
+            {
+                "mode": "rvt2eph",
+                "rvt": [[*sample["r"], *sample["v"]] for sample in generated["samples"]],
+                "start_utc": "2024-09-01T03:00:00Z",
+                "units": "m",
+            }
+        )
+        self.assertEqual(fit["bdt_week"], 974)
+        self.assertTrue(fit["converged"])
+        self.assertLess(fit["fit_error_rms_m"], 1e-4)
+        for index in range(17):
+            self.assertAlmostEqual(fit["parameters"][index], self.PARAMETERS[index], places=7)
+        self.assertAlmostEqual(fit["parameters"][17], 10804.0, places=6)
+
+    def test_rejects_not_60_rvt_groups(self):
+        with self.assertRaises(app.ApiError) as error:
+            app.convert_rvt18(
+                {
+                    "mode": "rvt2eph",
+                    "rvt": [[1, 2, 3, 4, 5, 6]] * 59,
+                    "start_utc": "2024-09-01T03:00:00Z",
+                    "units": "m",
+                }
+            )
+        self.assertEqual(error.exception.status, 400)
+
+    def test_rejects_non_minute_time_column(self):
+        with self.assertRaises(app.ApiError) as error:
+            app.convert_rvt18(
+                {
+                    "mode": "rvt2eph",
+                    "rvt": [[7_000_000, 0, 0, 0, 7_500, 0]] * 60,
+                    "rvt_times_s": [index * 30 for index in range(60)],
+                    "start_utc": "2024-09-01T03:00:00Z",
+                    "units": "m",
+                }
+            )
+        self.assertEqual(error.exception.status, 400)
+
+    def test_rejects_invalid_18_parameter_toe(self):
+        values = self.PARAMETERS[:]
+        values[17] = 604800
+        with self.assertRaises(app.ApiError):
+            app.convert_rvt18({"mode": "eph2rvt", "parameters": values, "bdt_week": 974})
+
+
+class SpacecraftModelTest(unittest.TestCase):
+    @staticmethod
+    def minimal_config():
+        return {
+            "DynInfo": {"SateName": "test_sat", "SeriesName": "T", "SateMessage": ""},
+            "SatModule": {
+                "Mass": 100.0,
+                "ModuleExpandFlag": [True, False],
+                "ModuleExpandFlagName": ["+YSADA", "-YSADA"],
+                "MassPro": {
+                    "SatBody": {
+                        "NodeName": "卫星本体",
+                        "ID": 1,
+                        "ExpandMass": 90.0,
+                        "ExpandMassCenter": [0, 0, 0],
+                    },
+                    "ChildPartLst": [
+                        {
+                            "NodeName": "+Y太阳翼",
+                            "ID": 3,
+                            "ParentID": 1,
+                            "ModuleFlagIdx": 0,
+                            "Expand": {
+                                "Mass": 5.0,
+                                "MassCenter": [2.0, 0, 0],
+                                "ConnectPoint": [1.5, 0, 0],
+                                "RotateDcm": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                            },
+                            "Collapse": {
+                                "Mass": 0,
+                                "MassCenter": [0, 0, 0],
+                                "ConnectPoint": [0, 0, 0],
+                                "RotateDcm": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                            },
+                        },
+                        {
+                            "NodeName": "-Y太阳翼",
+                            "ID": 5,
+                            "ParentID": 1,
+                            "ModuleFlagIdx": 1,
+                            "Expand": {
+                                "Mass": 5.0,
+                                "MassCenter": [2.0, 0, 0],
+                                "ConnectPoint": [1.5, 0, 0],
+                                "RotateDcm": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                            },
+                            "Collapse": {
+                                "Mass": 0,
+                                "MassCenter": [0, 0, 0],
+                                "ConnectPoint": [0, 0, 0],
+                                "RotateDcm": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                            },
+                        },
+                    ],
+                },
+            },
+            "Engine": [{"InstallPointM": [-1.5, 0, 0.4], "EngineDirectionM": [1, 0, 0]}],
+            "Gnss": [{"PosVetB": [0, 0, -1]}],
+            "Wheel": [{"PosVetB": [0.6, 0.3, -0.6]}],
+            "Star": [{"PosQbs": [1, 0, 0, 0]}],
+        }
+
+    def test_derive_respects_expand_flags(self):
+        model = app.derive_spacecraft_model(self.minimal_config(), "test_sat")
+        kinds = [node["kind"] for node in model["nodes"]]
+        self.assertEqual(kinds, ["body", "sunwing", "star-base", "star-cone", "engine", "wheel"])
+        wing = model["nodes"][1]
+        self.assertEqual(wing["name"], "+Y太阳翼")
+        self.assertEqual(wing["size"], [4.3, 2.1, 0.06])
+        self.assertEqual(wing["color"], "#2f6fb0")
+        self.assertEqual(wing["position"], [3.65, 0.0, 0.0])
+        self.assertEqual(wing["mass_center"], [2.0, 0.0, 0.0])
+
+    def test_derive_gizmo_shapes(self):
+        model = app.derive_spacecraft_model(self.minimal_config(), "test_sat")
+        by_kind = {node["kind"]: node for node in model["nodes"]}
+        engine = by_kind["engine"]
+        self.assertEqual(engine["size"], [0.35, 0.35, 0.35])
+        self.assertAlmostEqual(engine["position"][0], -1.025, places=9)
+        self.assertEqual(engine["position"][1:], [0.0, 0.4])
+        wheel = by_kind["wheel"]
+        self.assertEqual(wheel["shape"], "cylinder")
+        self.assertEqual(wheel["radius"], 0.16)
+        self.assertEqual(wheel["position"][2], -0.54)
+        star = by_kind["star-base"]
+        self.assertEqual(star["position"], [0.0, 0.0, 0.6])
+        cone = by_kind["star-cone"]
+        self.assertEqual(cone["shape"], "cone")
+        self.assertEqual(cone["parent"], star["id"])
+        body = by_kind["body"]
+        self.assertEqual(body["opacity"], 0.55)
+
+    def test_derive_expand_override(self):
+        config = self.minimal_config()
+        expanded = app.derive_spacecraft_model(config, "test_sat", expand=True)
+        self.assertEqual(sum(1 for node in expanded["nodes"] if node["kind"] == "sunwing"), 2)
+        collapsed = app.derive_spacecraft_model(config, "test_sat", expand=False)
+        self.assertEqual(sum(1 for node in collapsed["nodes"] if node["kind"] == "sunwing"), 0)
+
+    def test_derive_link_connects_wing(self):
+        config = {
+            "SatModule": {
+                "MassPro": {
+                    "SatBody": {"NodeName": "卫星本体", "ID": 1, "ExpandMass": 100.0},
+                    "ChildPartLst": [
+                        {
+                            "NodeName": "+Y连杆",
+                            "ID": 2,
+                            "ParentID": 1,
+                            "ModuleFlagIdx": -1,
+                            "Expand": {
+                                "Mass": 4.8,
+                                "MassCenter": [1.25, 0, 0],
+                                "ConnectPoint": [-0.141, 0.479105, 0.408081],
+                                "RotateDcm": [[0, 1, 0], [1, 0, 0], [0, 0, -1]],
+                            },
+                        },
+                        {
+                            "NodeName": "+Y太阳翼",
+                            "ID": 3,
+                            "ParentID": 2,
+                            "ModuleFlagIdx": -1,
+                            "Expand": {
+                                "Mass": 34.0,
+                                "MassCenter": [2.216, 0, 0.016],
+                                "ConnectPoint": [1.7749, 0, -0.01344],
+                                "RotateDcm": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                            },
+                        },
+                    ],
+                }
+            }
+        }
+        model = app.derive_spacecraft_model(config, "link_test")
+        link = next(node for node in model["nodes"] if node["kind"] == "link")
+        wing = next(node for node in model["nodes"] if node["kind"] == "sunwing")
+        self.assertAlmostEqual(link["size"][0], 1.924947, places=6)
+        self.assertEqual(link["color"], "#5c6670")
+        self.assertAlmostEqual(link["position"][1], 1.441555, places=9)
+        self.assertEqual(wing["parent"], 2)
+        self.assertAlmostEqual(wing["position"][0], 3.9249, places=9)
+
+    def test_derive_empty_config_is_graceful(self):
+        model = app.derive_spacecraft_model({}, "empty")
+        self.assertEqual(len(model["nodes"]), 1)
+        self.assertEqual(model["nodes"][0]["kind"], "body")
+        self.assertEqual(model["info"][0], {"label": "卫星名称", "value": "-"})
+
+    def test_spacecraft_config_path_validation(self):
+        path = app.spacecraft_config_path("star_001")
+        self.assertEqual(path.name, "star_001.json")
+        with self.assertRaises(app.ApiError) as bad:
+            app.spacecraft_config_path("../secret")
+        self.assertEqual(bad.exception.status, 400)
+        with self.assertRaises(app.ApiError) as missing:
+            app.spacecraft_config_path("no_such_satellite")
+        self.assertEqual(missing.exception.status, 404)
+
+    def test_starlink_v3_concept_has_dual_wings_and_disclosure(self):
+        model = app.derive_starlink_v3_model()
+        wings = [node for node in model["nodes"] if node["kind"] == "solar-array"]
+        self.assertEqual(len(wings), 2)
+        self.assertEqual({node["name"] for node in wings}, {"+Y 太阳翼", "-Y 太阳翼"})
+        self.assertAlmostEqual(wings[0]["size"][1], 19.0)
+        self.assertAlmostEqual(wings[1]["size"][1], 19.0)
+        self.assertIsNone(model["mass_kg"])
+        self.assertIn("未公开", " ".join(item["value"] for item in model["info"]))
+        self.assertTrue(any(node["kind"] == "phased-array" for node in model["nodes"]))
+        self.assertEqual(sum(node["kind"] == "optical-terminal" for node in model["nodes"]), 6)
+        self.assertEqual(sum(node["kind"] == "rf-backhaul" for node in model["nodes"]), 4)
+        self.assertIn("starlink.com", model["source"])
+
+    def test_starlink_v3_expand_override_only_changes_wings(self):
+        expanded = app.derive_starlink_v3_model(True)
+        folded = app.derive_starlink_v3_model(False)
+        expanded_wings = [n for n in expanded["nodes"] if n["kind"] == "solar-array"]
+        folded_wings = [n for n in folded["nodes"] if n["kind"] == "solar-array"]
+        self.assertEqual([n["size"][1] for n in expanded_wings], [19.0, 19.0])
+        self.assertEqual([n["size"][1] for n in folded_wings], [2.8, 2.8])
+        self.assertEqual(
+            [n["kind"] for n in expanded["nodes"]],
+            [n["kind"] for n in folded["nodes"]],
+        )
+
+
 class RecentLaunchParseTest(unittest.TestCase):
     @staticmethod
     def record(name, norad_id, object_id, launch_date, object_type="PAY", decay_date=""):

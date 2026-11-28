@@ -19,8 +19,10 @@
       <button class="nav-btn active" data-page="home">首页</button>
       <button class="nav-btn" data-page="sim">仿真</button>
       <button class="nav-btn" data-page="aps">轨道转换</button>
+      <button class="nav-btn" data-page="rv18">RVT ↔ 18参数</button>
       <button class="nav-btn" data-page="tle">TLE 递推</button>
       <button class="nav-btn" data-page="query">TLE 查询</button>
+      <button class="nav-btn" data-page="view3d">三维显示</button>
       <button class="nav-btn" data-page="f107">F10.7</button>
     </nav>
     <div class="top-status">
@@ -58,7 +60,7 @@
       <div class="home-content">
         <div class="home-wordmark">SatelliteTool</div>
         <p class="home-tagline">卫星仿真 · 轨道转换 · TLE 工具集</p>
-        <div class="home-shortcuts">
+        <div class="home-shortcuts" id="homeShortcuts">
           <button class="home-shortcut" data-go="sim">
             <span class="shortcut-icon shortcut-sim">SIM</span>
             <span class="shortcut-label">仿真</span>
@@ -78,6 +80,11 @@
             <span class="shortcut-icon shortcut-query">CAT</span>
             <span class="shortcut-label">TLE 查询</span>
             <span class="shortcut-desc">Celestrak NORAD</span>
+          </button>
+          <button class="home-shortcut" data-go="view3d">
+            <span class="shortcut-icon shortcut-view3d">3D</span>
+            <span class="shortcut-label">三维显示</span>
+            <span class="shortcut-desc">卫星结构 · 星上设备</span>
           </button>
           <button class="home-shortcut" data-go="f107">
             <span class="shortcut-icon shortcut-f107">F10.7</span>
@@ -286,6 +293,90 @@
       </div>
     </section>
 
+    <section id="page-rv18" class="page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">EPHEMERIS FIT</p>
+          <h2>惯性系 RVT ↔ 18 参数</h2>
+        </div>
+        <span class="hint">J2000 惯性系 · 60 组 · 1 分钟间隔</span>
+      </div>
+      <div class="layout two-column rv18-layout">
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">输入数据</div>
+          </div>
+          <label class="field">
+            <span>转换方向</span>
+            <select id="rv18Mode">
+              <option value="rvt2eph">60 组 RVT → 18 参数（拟合）</option>
+              <option value="eph2rvt">18 参数 → 60 组 RVT（递推）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>R / V 单位</span>
+            <select id="rv18Units">
+              <option value="km">位置 km，速度 km/s（Excel 常用）</option>
+              <option value="m">位置 m，速度 m/s（MATLAB 内部单位）</option>
+            </select>
+          </label>
+          <div id="rv18RvtInput">
+            <label class="field">
+              <span>起始 UTC（用于计算 BDT 周和 toe）</span>
+              <input id="rv18StartUtc" type="datetime-local" step="1" value="2024-09-01T03:00:00">
+            </label>
+            <label class="field">
+              <span>RVT 数据（60 行；每行 Rx,Ry,Rz,Vx,Vy,Vz；可选在最前加时间列）</span>
+              <textarea id="rv18Rvt" rows="12" spellcheck="false" placeholder="每行 6 或 7 列，逗号/制表符分隔&#10;若有时间列，格式为 time,Rx,Ry,Rz,Vx,Vy,Vz&#10;60 行，每行相隔 60 秒"></textarea>
+            </label>
+          </div>
+          <div id="rv18EphInput" hidden>
+            <label class="field">
+              <span>BDT 历元周（Gen_18Cmd 的周字段）</span>
+              <input id="rv18BdtWeek" type="number" min="0" step="1" value="974">
+            </label>
+            <label class="field">
+              <span>18 参数（按下表顺序；每行一个，或逗号分隔）</span>
+              <textarea id="rv18Parameters" rows="12" spellcheck="false" placeholder="a（m）&#10;e&#10;i0（rad）&#10;Omega0（rad）&#10;omega（rad）&#10;M0（rad）&#10;delta_n0（rad/s）&#10;Omega_dot（rad/s）&#10;i0_dot（rad/s）&#10;Cus（rad）&#10;Cuc（rad）&#10;Cis（rad）&#10;Cic（rad）&#10;Crs（m）&#10;Crc（m）&#10;A_dot（m/s）&#10;delta_n0_dot（rad/s^2）&#10;toe（BDT 周内秒）"></textarea>
+            </label>
+          </div>
+          <div class="button-row">
+            <button class="btn primary" id="runRv18" type="button">开始转换</button>
+            <span id="rv18Message" class="hint"></span>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <div class="panel-title">转换结果</div>
+            <button class="btn ghost" id="copyRv18" type="button" disabled>复制结果</button>
+          </div>
+          <textarea id="rv18Output" class="rv18-output" rows="22" readonly placeholder="转换结果将显示在这里"></textarea>
+        </section>
+      </div>
+      <section class="panel rv18-parameter-panel">
+        <div class="panel-head">
+          <div class="panel-title">18 参数定义（与 ** 顺序一致）</div>
+          <span class="hint">地心引力常数 μ = 3.986004418×10¹⁴ m³/s²</span>
+        </div>
+        <div class="table-wrap">
+          <table class="rv18-parameter-table">
+            <thead><tr><th scope="col">序号</th><th scope="col">参数</th><th scope="col">单位</th><th scope="col">说明</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>a</td><td>m</td><td>参考半长轴</td></tr>
+              <tr><td>2</td><td>e</td><td>无量纲</td><td>偏心率</td></tr>
+              <tr><td>3–6</td><td>i0, Ω0, ω, M0</td><td>rad</td><td>参考倾角、升交点赤经、近地点幅角、平近点角</td></tr>
+              <tr><td>7–9</td><td>Δn0, Ω̇, i̇0</td><td>rad/s</td><td>平均运动改正、升交点与倾角变化率</td></tr>
+              <tr><td>10–13</td><td>Cus, Cuc, Cis, Cic</td><td>rad</td><td>二倍纬度幅角的谐波改正系数</td></tr>
+              <tr><td>14–15</td><td>Crs, Crc</td><td>m</td><td>轨道半径谐波改正系数</td></tr>
+              <tr><td>16–17</td><td>ȧ, Δṅ0</td><td>m/s, rad/s²</td><td>半长轴变化率、平均运动变化率</td></tr>
+              <tr><td>18</td><td>toe</td><td>s</td><td>参考历元 BDT 周内秒；BDT 周另行输入/输出</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint">RVT → 18 参数按 ** 的惯性系位置残差最小二乘拟合。输入为 60 组等间隔位置/速度；速度用于初值，拟合残差使用位置。</p>
+      </section>
+    </section>
+
     <section id="page-tle" class="page">
       <div class="page-head">
         <div>
@@ -395,6 +486,53 @@
             <div id="queryResults" class="table-wrap query-results"></div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section id="page-view3d" class="page">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">3D VIEW</p>
+          <h2>三维显示</h2>
+        </div>
+        <span class="hint">Starlink V3 外观概念模型 · 官方完整外形尺寸未公开</span>
+      </div>
+      <div class="layout view3d-layout" id="view3d-layout" data-zone="view3d">
+        <section class="panel view3d-canvas-panel" data-panel="view3d-canvas">
+          <div class="panel-head">
+            <div class="panel-title">Starlink V3 概念外观</div>
+            <div class="button-row compact">
+              <label class="inline-field">
+                <span>太阳翼</span>
+                <select id="view3dExpand">
+                  <option value="">展开（默认）</option>
+                  <option value="1">展开</option>
+                  <option value="0">收拢</option>
+                </select>
+              </label>
+              <button class="btn ghost" id="view3dAuto" type="button">自动旋转</button>
+              <button class="btn ghost" id="view3dReset" type="button">重置视角</button>
+            </div>
+          </div>
+          <canvas id="view3dCanvas" width="960" height="560" aria-label="卫星三维结构示意"></canvas>
+          <p id="view3dMessage" class="hint"></p>
+        </section>
+        <section class="panel" data-panel="view3d-info">
+          <div class="panel-head">
+            <div class="panel-title">结构参数</div>
+            <span id="view3dMeta" class="hint"></span>
+          </div>
+          <div class="table-wrap">
+            <table class="view3d-info-table">
+              <thead><tr><th scope="col">参数</th><th scope="col">值</th></tr></thead>
+              <tbody id="view3dInfo"></tbody>
+            </table>
+          </div>
+          <p class="hint">
+            外观按公开特征概念化；尺寸与布局为示意，非官方工程图。
+            <a href="https://starlink.com/updates/starlink-version-3-satellites" target="_blank" rel="noopener noreferrer">Starlink V3 官方资料</a>
+          </p>
+        </section>
       </div>
     </section>
 

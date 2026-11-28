@@ -50,13 +50,17 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
 
 ## 2. 功能
 
-- **首页**：纯黑背景、五个快捷入口和 WALL-E 风格机器人；机器人从上下左右
-  任一边完全离开后都会从对侧进入，并支持方向键控制；
+- **首页**：纯黑背景、六个可拖动排序的快捷入口和 WALL-E 风格机器人；
+  拖动后的入口顺序保存在浏览器 localStorage；机器人从上下左右任一边完全
+  离开后都会从对侧进入，并支持方向键控制；
 - **仿真**：选择场景、仿真时长和 CSV 配置，运行 `BlueSpace.exe`；
   预览表显示前 20 行，曲线对完整数据流式降采样；
 - **轨道转换**：调用 `ApsOrbitTool.exe`，结果表随输入方向显示“输入/输出”
   两列（输出列高亮），一键复制方向对应的输出参数；页面下方另有 J2000 RV
   与六根数（`a/e/i/Ω/ω/M`）的双向转换；
+- **惯性系 RVT ↔ 18 参数**：按 `**` 模型定义进行 60 组、每分钟采样的
+  J2000 惯性系 RVT 与 18 参数互转；支持 km/km·s⁻¹ 或 m/m·s⁻¹ 输入、
+  起始 UTC/BDT 历元、拟合误差显示与结果复制；
 - **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度，结果表支持
   一键复制 CSV 数据；
 - **TLE 查询**：Celestrak 查询最多 10 个 NORAD ID，结果按行展示，支持单行/全部
@@ -64,8 +68,15 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
   分为中国/国外两列；左侧同时显示最近 30 天内最新一个发射日的载荷；
 - **F10.7 空间环境**：NASA OMNI2 最新日值、81 天均值和近 183 天曲线，
   支持复制曲线 CSV；
-- **拖动布局**：轨道转换、TLE 递推、TLE 查询和 F10.7 页面支持按住面板标题
-  拖动调整面板位置与顺序，布局保存在浏览器 localStorage；
+- **三维显示**：Starlink V3 概念外观，按右手系展示双长展太阳翼、相控阵面、
+  六个光学星间链路端口、四个 RF 回传天线及推进组件；支持鼠标拖动旋转、
+  滚轮缩放、自动旋转和太阳翼展开/收拢，右侧展示公开参数与资料来源；
+  首页提供快捷入口。通信能力和双阵列特征来自 SpaceX 公开资料；V3 的
+  完整机械图、整翼尺寸、外形和部件位置未公开，画面比例/布局为概念示意。
+- RVT 转换的输入可以是 60 行 `Rx,Ry,Rz,Vx,Vy,Vz`，也可附加首列时间；反向
+  使用按 GNC 顺序排列的 18 个参数和独立 BDT 周值，输出 60 行 CSV。
+- **拖动布局**：轨道转换、TLE 递推、TLE 查询、三维显示和 F10.7 页面支持
+  按住面板标题拖动调整面板位置与顺序，布局保存在浏览器 localStorage；
 - **CSV 定制**：按 JSON 配置选择列、重命名、缩放、偏移和精度；
 - **历史任务**：日志、原始 CSV、定制 CSV、调度统计；支持清理历史；
 - **安全/资源边界**：本机监听、Host/Origin 校验、统一错误、仿真/SGP4/预览上限。
@@ -190,6 +201,24 @@ SatelliteTool/
 J2000 位置速度。引力常数 μ 默认 398600.4418 km³/s²，可修改；仅支持椭圆
 轨道（`e < 1`），结果可一键复制。
 
+### 惯性系 RVT ↔ 18 参数
+
+页面按 `**` 的 18 参数模型转换 60 组、间隔 60 秒的 J2000 惯性系
+RVT。RVT → 18 参数使用首组 RV 初始化，按 60 个位置残差作最小二乘拟合；
+速度用于初始化轨道根数。18 参数 → RVT 按解析模型从起始历元递推 60 个样本。
+转换和拟合均由 `app.py` 中的 Python 实现完成，不调用 MATLAB、MATLAB Runtime
+或目录中的 `.m` 脚本；该目录仅作为算法定义与字段约定的参考。
+
+RVT 输入支持每行 `Rx,Ry,Rz,Vx,Vy,Vz` 六列，或首列加时间的七列；
+时间列如提供必须间隔 60 秒。可选 `km/km/s`（Excel 常见）或 `m/m/s`
+（GNC 算法内部单位）。起始时间按 UTC 输入，转换 BDT 周时使用 GNC 代码约定
+`BDT = UTC + 4 s`。反向需另填 BDT 周和 18 个数值。
+
+18 参数顺序与 GNC 拟合向量一致：
+`a, e, i0, Ω0, ω, M0, Δn0, Ωdot, idot, Cus, Cuc, Cis, Cic, Crs, Crc, Adot, Δndot, toe`。
+角度及角度改正为 rad，时间导数为 rad/s 或 rad/s²，长度为 m，`toe` 为 BDT
+周内秒；BDT 周单独填写。此转换面向椭圆轨道，输出拟合 RMS（m）与 60 行 RVT CSV。
+
 ### TLE 递推
 
 输入两行 TLE、递推天数、步长和输出间隔，调用 `Sgp4EcefTool.exe`。采样点数量
@@ -215,6 +244,24 @@ J2000 位置速度。引力常数 μ 默认 398600.4418 km³/s²，可修改；�
 “未分类”。分类结果缓存在 `config/user/norad_countries.json`，只有遇到新 ID
 时才批量下载 GCAT 目录；数据源不可用时列表仍正常显示。
 
+### 三维显示
+
+三维显示页使用 Starlink V3 概念模型（右手系），不更改仿真使用的
+`star_001.json`。模型以箱体表示总线平台，双长展太阳翼沿 ±Y 展开，表面以
+网格表示太阳能阵列；平台上展示相控阵面、四个四频段 RF 回传天线、六个光学
+星间链路端口及推进组件。拖动旋转、滚轮缩放，支持自动旋转和太阳翼展开/
+收拢，右侧列出公开特征与模型说明。
+
+**尺寸免责声明**：SpaceX 尚未公开 V3 的完整机械图、准确质量、外形尺寸、
+太阳翼总翼展或部件精确布局。模型仅依据公开的功能特征制作；太阳翼采用约
+19 m 级太阳毯段作为比例参考，整翼长度、平台大小、天线/链路位置均为视觉
+示意，不能用于工程、仿真或制造。通信能力数字（下行 >1 Tbps、上行 >200 Gbps、
+2048 个上下行波束、6 个 400 Gbps 光学链路、4 个四频段回传天线、太阳能发电
+约为 V2 的 2 倍）为 SpaceX 公布的设计目标/特征。
+
+资料来源：[Starlink Version 3 Satellites](https://starlink.com/updates/starlink-version-3-satellites)
+ · [Starlink Progress 2025](https://starlink.com/public-files/starlinkProgressReport%5F2025.pdf)
+
 ### F10.7 空间环境
 
 展示 NASA OMNI2 的最新日 F10.7（1 AU 调整值）、81 天均值和近 183 天变化曲线；
@@ -234,6 +281,8 @@ J2000 位置速度。引力常数 μ 默认 398600.4418 km³/s²，可修改；�
 | GET | `/api/jobs/<id>/file?name=...` | 下载产物 |
 | GET | `/api/norad/saved` | 读取已保存的 NORAD ID 及中国/国外分组 |
 | GET | `/api/celestrak/recent-launches` | 最新一天发射的载荷 |
+| GET | `/api/spacecraft/model?name=star_001` | 从配置文件推导的航天器模型 |
+| GET | `/api/spacecraft/model?model=starlink-v3&expand=1` | Starlink V3 概念外观模型 |
 | GET | `/api/f107?refresh=1` | F10.7 最新值与近半年序列 |
 | POST | `/api/run` | `{scenario, simulation_time?, csv_profile}` |
 | POST | `/api/norad/saved` | 保存 `{norad_ids}`（追加去重） |
@@ -243,6 +292,7 @@ J2000 位置速度。引力常数 μ 默认 398600.4418 km³/s²，可修改；�
 | DELETE | `/api/jobs` | 清理所有非运行中任务 |
 | POST | `/api/aps` | APS 转换 |
 | POST | `/api/orbit/convert` | J2000 RV 与六根数互转 |
+| POST | `/api/rv18/convert` | 惯性系 RVT 与 GNC 18 参数互转 |
 | POST | `/api/sgp4` | SGP4 递推 |
 | POST | `/api/celestrak` | TLE 查询 |
 
@@ -274,9 +324,9 @@ python -m black --check .
 node --check static/app.js
 ```
 
-当前测试 33 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
+当前测试 46 项，覆盖 CSV 导出、预览降采样、路径校验、配置校验、APS/SGP4 参数、
 Host/Origin、Content-Type、任务清理、NORAD 保存/删除、国家分组、最新发射解析、
-J2000 RV 六根数互转和 F10.7 解析。
+J2000 RV 六根数互转、航天器模型推导和 F10.7 解析。
 
 `app.py` 运行时只使用 Python 标准库，支持 Python 3.9+。Ruff/Black 开发工具
 当前要求 Python 3.10+；CI 在 Python 3.12 上执行 lint，在 3.9–3.13 上执行测试。

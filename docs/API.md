@@ -146,6 +146,53 @@ RV → 六根数：
 返回 `result.mode = "el2rv"`，包含 `r_km`、`v_km_s`、`r_norm_km`、
 `v_norm_km_s`。仅支持椭圆轨道（`e < 1`、能量为负），否则返回 400。
 
+### `POST /api/rv18/convert`
+
+将 `**` 格式的 18 参数与 60 组 J2000 惯性系 RVT 相互转换。
+状态递推、拟合与线性方程求解均由 Python 进程内实现；不调用 MATLAB、
+MATLAB Runtime 或 `.m` 脚本。
+
+RVT → 18 参数：
+
+```json
+{
+  "mode": "rvt2eph",
+  "units": "km",
+  "start_utc": "2024-09-01T03:00:00Z",
+  "rvt": [
+    [6913.809933, -1192.067359, 421.023692, 0.47815, 4.838418, 5.750788]
+  ]
+}
+```
+
+`rvt` 实际必须提供 60 行，每行依次是 `Rx,Ry,Rz,Vx,Vy,Vz`。也可在前端粘贴
+带首列时间的 7 列数据；时间列需每行间隔 60 秒。`units` 可为 `km`（位置 km、
+速度 km/s）或 `m`（位置 m、速度 m/s）。RVT → 18 参数用位置残差最小二乘拟合，
+速度仅用于初始轨道根数；响应包含 `parameters`（18 项）、`bdt_week`、
+`fit_error_rms_m`、`iterations` 和 `converged`。UTC 转 BDT 按 GNC 代码中的
+`BDT = UTC + 4 s`，BDT 周内秒为第 18 参数 `toe`。
+
+18 参数 → RVT：
+
+```json
+{
+  "mode": "eph2rvt",
+  "units": "km",
+  "bdt_week": 974,
+  "parameters": [
+    7000000, 0.01, 0.9, 1, 0.5, 0.3,
+    1e-8, -1e-7, 1e-9, 1e-6, -2e-6, 3e-7, -4e-7,
+    100, 50, 0.01, 1e-12, 10804
+  ]
+}
+```
+
+`parameters` 顺序为 `a,e,i0,Ω0,ω,M0,Δn0,Ωdot,idot,Cus,Cuc,Cis,Cic,Crs,Crc,Adot,Δndot,toe`。
+单位依次为 m、无量纲、rad、rad、rad、rad、rad/s、rad/s、rad/s、rad、rad、rad、
+rad、m、m、m/s、rad/s²、BDT 周内秒。`bdt_week` 单独给出。响应 `samples`
+含 60 项，每项为 `{t_s, r:[x,y,z], v:[vx,vy,vz]}`，时间从 0 到 3540 秒，
+间隔 60 秒；位置/速度单位由 `units` 决定。只支持椭圆轨道。
+
 ### `POST /api/sgp4`
 
 ```json
@@ -240,6 +287,61 @@ RV → 六根数：
 `tle_available` 表示该 NORAD ID 能否用 TLE 格式查询（6 位 ID 为 `false`）。
 缓存时间由 `celestrak.recent_launches_cache_ttl_s` 控制，默认 1800 秒；
 `refresh=1` 强制刷新；数据源失败时返回上次缓存并设置 `stale=true`、`warning`。
+
+### `GET /api/spacecraft/model?name=star_001&expand=1`
+
+读取 `runtime/cfg/spacecraft/<name>.json` 并推导三维示意模型：
+
+```json
+{
+  "ok": true,
+  "name": "star_001",
+  "sate_name": "star_001",
+  "series": "StarHalo",
+  "mass_kg": 664.36,
+  "expand_flags": [{"index": 0, "name": "+YSADA", "expanded": true}],
+  "nodes": [
+    {
+      "id": 3,
+      "name": "+Y太阳翼",
+      "parent": 2,
+      "kind": "sunwing",
+      "position": [2.216, 0, 0.016],
+      "dcm": [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      "size": [4.3, 2.1, 0.06],
+      "color": "#2f6fb0",
+      "mass_kg": 34.228,
+      "connect_point": [1.7749, 0, -0.01344]
+    }
+  ],
+  "info": [{"label": "卫星名称", "value": "star_001"}]
+}
+```
+
+`name` 必须为字母、数字、点、下划线或连字符；文件不存在返回 404。
+`expand=1/0` 覆盖 `ModuleExpandFlag` 的前两项（太阳翼）展开状态，
+省略时按配置文件原值。`nodes` 中 `kind` 为 `body`、`link`、`sunwing`、
+`star-base`、`star-cone`、`engine`、`wheel`，`shape` 为 `box`、
+`cylinder`（动量轮，星内扁圆柱）或 `cone`（星敏遮光罩）；连杆从本体
+`ConnectPoint` 延伸到翼面连接点并再深入帆板 0.15 m；星敏指向由
+`PosQbs` 四元数推导并投影到星表，电推按推力方向安装在星表。配置没有
+显式几何时按质量特性给出示意尺寸，`info` 为页面参数表。
+
+### `GET /api/spacecraft/model?model=starlink-v3&expand=1`
+
+返回 Starlink V3 外观概念模型，不读取或修改仿真用的 `star_001.json`。
+`expand=1/0` 控制双太阳翼展开/收拢。返回 `nodes` 包含 `solar-array`、
+`phased-array`、`rf-backhaul`、`optical-terminal` 和 `thruster` 等示意部件；
+`info` 将公开能力目标与未公开机械尺寸分别标注。
+
+可核实的 SpaceX 公开特征包括：V3 下行目标超过 1 Tbps、2025 年资料中的
+上行目标超过 200 Gbps、2048 个上下行波束、6 个 400 Gbps 光学星间链路、
+4 个四频段 RF 回传天线，以及太阳翼发电量约为 V2 的两倍。V3 完整机械图、
+准确外形尺寸、整翼翼展和部件布局没有公开；模型中约 19 m 的太阳毯段比例、
+外形尺寸和设备布置仅作可视化示意，不应作为工程尺寸使用。
+
+来源：[Starlink Version 3 Satellites](https://starlink.com/updates/starlink-version-3-satellites)、
+[Starlink Progress 2025](https://starlink.com/public-files/starlinkProgressReport%5F2025.pdf)。
 
 ### `GET /api/f107?refresh=1`
 

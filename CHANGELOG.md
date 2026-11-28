@@ -4,6 +4,10 @@
 
 ### Added
 
+- 首页快捷功能图标支持拖动排序，排序结果与其他可拖动布局一起保存在浏览器
+  localStorage；
+- 新增“惯性系 RVT ↔ 18 参数”页面及 `POST /api/rv18/convert`：按 `**`
+  模型对 60 组一分钟间隔数据拟合/递推，支持 km 与 SI 单位，输出 BDT 历元及拟合 RMS；
 - F10.7 空间环境页：NASA OMNI2 最新日值、81 天均值和近半年曲线，
   支持复制曲线 CSV；
 - TLE 查询页 NORAD ID 本地保存：`config/user/norad_ids.txt`，
@@ -13,18 +17,25 @@
 - TLE 查询页左侧新增“最新一天发射的航天器”：从 CelesTrak SATCAT 最近
   30 天记录中提取最新发射日的载荷，显示名称、NORAD ID、国家/发射场和在轨
   状态，支持一键加入查询栏；
-- 轨道转换、TLE 递推、TLE 查询和 F10.7 页面支持按住面板标题拖动调整布局，
-  布局保存在浏览器 localStorage；
+- 轨道转换、TLE 递推、TLE 查询、三维显示和 F10.7 页面支持按住面板标题
+  拖动调整布局，布局保存在浏览器 localStorage；
 - TLE 递推结果表支持一键复制全部采样点为 CSV；
 - 轨道转换结果表随输入方向自适应：显示“输入/输出”两列并高亮输出列，
   复制按钮文案与内容跟随方向（平根/瞬根）；
 - 轨道转换页新增 J2000 RV ↔ 六根数双向转换（API `POST /api/orbit/convert`），
   纯 Python 二体计算，支持修改 μ、结果一键复制；
+- “三维显示”页改为 Starlink V3 概念外观：双长展太阳翼、相控阵面、六个
+  光学星间链路端口、四个四频段 RF 回传天线及推进组件；能力目标和非公开
+  尺寸免责声明同步展示，仿真配置 `star_001.json` 保持不变；
+- 三维显示页支持拖动旋转、滚轮缩放、自动旋转和太阳翼展开/收拢，首页提供
+  快捷入口；
+- 航天器模型 API 支持 `model=starlink-v3`，与基于配置文件的默认模型并存；
 - 新增 API：`GET /api/f107`、`GET/POST /api/norad/saved`、
-  `POST /api/norad/saved/delete`、`GET /api/celestrak/recent-launches`；
+  `POST /api/norad/saved/delete`、`GET /api/celestrak/recent-launches`、
+  `POST /api/orbit/convert`、`GET /api/spacecraft/model`；
   保存接口同时返回国家分组；
-- 单元测试扩展到 33 项，覆盖 NORAD 保存/删除、国家分组、最新发射解析、
-  J2000 RV 六根数互转和 F10.7 解析。
+- 单元测试扩展到 46 项，覆盖 NORAD 保存/删除、国家分组、最新发射解析、
+  J2000 RV 六根数互转、RVT/18 参数互转、Starlink V3 概念模型和 F10.7 解析。
 
 ## 0.2.0 - 2026-11-15
 

@@ -13,7 +13,11 @@
     recentLaunches: null,
     recentLaunchesAt: 0,
     recentLaunchesLoading: false,
+    view3dModel: null,
+    view3dLoading: false,
     drag: null,
+    homeShortcutDrag: null,
+    homeShortcutClickSuppressedUntil: 0,
     f107: null,
     f107Loading: false,
     pollFailures: 0,
@@ -106,6 +110,11 @@
         window.requestAnimationFrame(drawF107Chart);
       }
     }
+    if (page === "view3d") {
+      if (!state.view3dModel && !state.view3dLoading) {
+        loadView3dModel();
+      }
+    }
     if (updateHash && window.location.hash !== "#" + page) {
       window.location.hash = page;
     }
@@ -113,7 +122,7 @@
 
   function pageFromHash() {
     const page = (window.location.hash || "#home").replace("#", "");
-    return ["home", "sim", "aps", "tle", "query", "f107"].includes(page)
+    return ["home", "sim", "aps", "rv18", "tle", "query", "view3d", "f107"].includes(page)
       ? page
       : "home";
   }
@@ -1004,6 +1013,158 @@
     await copyText(content, "已复制 J2000 转换结果");
   }
 
+  function parseRv18Input(text) {
+    const lines = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && !line.startsWith("%"));
+    const rows = [];
+    const sourceTimes = [];
+    let hasTimeColumn = null;
+    lines.forEach((line) => {
+      const cells = line.includes(",") || line.includes("\t") || line.includes(";")
+        ? line.split(/[,\t;]+/).map((cell) => cell.trim())
+        : line.split(/\s+/);
+      const hasTime = cells.length === 7;
+      const values = hasTime ? cells.slice(1).map(Number) : cells.map(Number);
+      if (
+        (cells.length !== 6 && cells.length !== 7) ||
+        values.some((value) => !Number.isFinite(value))
+      ) {
+        // Allow a single heading row (for example, UTCG,x,y,z,vx,vy,vz).
+        if (!rows.length && /[a-zA-Z\u4e00-\u9fff]/.test(line)) return;
+        throw new Error("RVT 行应为 6 列 R/V，或 7 列 time,R,V；请检查第 " + (rows.length + 1) + " 行");
+      }
+      if (hasTimeColumn !== null && hasTimeColumn !== hasTime) {
+        throw new Error("RVT 数据不能混用带时间列和不带时间列的行");
+      }
+      hasTimeColumn = hasTime;
+      if (hasTime) {
+        const numericTime = Number(cells[0]);
+        const time = Number.isFinite(numericTime)
+          ? numericTime
+          : Date.parse(cells[0]) / 1000;
+        if (!Number.isFinite(time)) {
+          throw new Error("无法识别时间列，请用秒、Excel UTCG 日期或 ISO UTC 时间");
+        }
+        sourceTimes.push(time);
+      }
+      rows.push(values);
+    });
+    if (rows.length !== 60) {
+      throw new Error("需要正好 60 组 RVT 数据；当前识别到 " + rows.length + " 组");
+    }
+    let times = null;
+    if (hasTimeColumn) {
+      const diffs = sourceTimes.slice(1).map((value, index) => value - sourceTimes[index]);
+      const sorted = diffs.slice().sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const scale = Math.abs(median) < 0.01 ? 86400 : 1;
+      times = sourceTimes.map((value) => (value - sourceTimes[0]) * scale);
+      if (diffs.some((diff) => Math.abs(diff * scale - 60) > 0.5)) {
+        throw new Error("时间列必须严格按 60 秒间隔排列");
+      }
+    }
+    return { rows, times };
+  }
+
+  function parseEph18Input(text) {
+    const values = text
+      .split(/[\s,;\t]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map(Number);
+    if (values.length !== 18 || values.some((value) => !Number.isFinite(value))) {
+      throw new Error("18 参数需按定义顺序输入 18 个有限数值");
+    }
+    return values;
+  }
+
+  async function runRv18Conversion() {
+    const mode = $("#rv18Mode").value;
+    const units = $("#rv18Units").value;
+    const message = $("#rv18Message");
+    const button = $("#runRv18");
+    const output = $("#rv18Output");
+    message.className = "hint";
+    message.textContent = "正在转换...";
+    button.disabled = true;
+    $("#copyRv18").disabled = true;
+    try {
+      let body = { mode, units };
+      if (mode === "rvt2eph") {
+        body.start_utc = $("#rv18StartUtc").value;
+        const parsed = parseRv18Input($("#rv18Rvt").value);
+        body.rvt = parsed.rows;
+        if (parsed.times) body.rvt_times_s = parsed.times;
+      } else {
+        body.bdt_week = $("#rv18BdtWeek").value;
+        body.parameters = parseEph18Input($("#rv18Parameters").value);
+      }
+      const data = await api("/api/rv18/convert", {
+        method: "POST",
+        body,
+        timeoutMs: 90000,
+      });
+      const result = data.result;
+      let content = "";
+      if (mode === "rvt2eph") {
+        content = [
+          "# BDT week\t" + result.bdt_week,
+          "# 拟合 RMS (m)\t" + Number(result.fit_error_rms_m).toFixed(6),
+          "# iterations\t" + result.iterations,
+          "index\tparameter\tunit\tvalue",
+          ...result.parameters.map(
+            (value, index) =>
+              (index + 1) +
+              "\t" +
+              result.parameter_names[index] +
+              "\t" +
+              result.parameter_units[index] +
+              "\t" +
+              Number(value).toPrecision(15)
+          ),
+        ].join("\n");
+        message.textContent =
+          "完成：1 组 18 参数 · 拟合 RMS " +
+          Number(result.fit_error_rms_m).toFixed(4) +
+          " m" +
+          (result.converged ? "" : "（迭代未完全收敛）");
+        message.className = result.converged ? "hint" : "hint error-text";
+      } else {
+        const rDigits = units === "km" ? 9 : 4;
+        const vDigits = units === "km" ? 12 : 7;
+        content = [
+          "t_s,Rx,Ry,Rz,Vx,Vy,Vz",
+          ...result.samples.map((sample) =>
+            [
+              Number(sample.t_s).toFixed(0),
+              ...sample.r.map((value) => Number(value).toFixed(rDigits)),
+              ...sample.v.map((value) => Number(value).toFixed(vDigits)),
+            ].join(",")
+          ),
+        ].join("\n");
+        message.textContent =
+          "完成：生成 " + result.count + " 组 RVT，间隔 60 秒（" + units + "）";
+      }
+      output.value = content;
+      $("#copyRv18").disabled = !content;
+    } catch (error) {
+      message.className = "hint error-text";
+      message.textContent = error.message;
+      output.value = "";
+      toast(error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function copyRv18Result() {
+    const content = $("#rv18Output").value;
+    if (!content) return;
+    await copyText(content, "已复制 RVT / 18 参数结果");
+  }
+
   async function submitTle(event) {
     event.preventDefault();
     const body = {
@@ -1685,6 +1846,12 @@
     $$("[data-zone]").forEach((zone) => {
       payload[zone.dataset.zone] = zonePanels(zone).map((panel) => panel.dataset.panel);
     });
+    const homeShortcuts = $("#homeShortcuts");
+    if (homeShortcuts) {
+      payload.homeShortcuts = $$(".home-shortcut", homeShortcuts).map(
+        (button) => button.dataset.go
+      );
+    }
     try {
       window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(payload));
     } catch (error) {
@@ -1764,8 +1931,114 @@
     }
   }
 
+  function onHomeShortcutDragStart(event) {
+    const shortcut = event.currentTarget;
+    const parent = shortcut.parentElement;
+    if (!parent) return;
+    state.homeShortcutDrag = {
+      shortcut,
+      parent,
+      nextSibling: shortcut.nextElementSibling,
+      dropped: false,
+    };
+    event.dataTransfer.effectAllowed = "move";
+    try {
+      event.dataTransfer.setData("text/plain", shortcut.dataset.go || "");
+    } catch (error) {
+      // Ignore browsers that do not expose writable drag data.
+    }
+    window.setTimeout(() => {
+      if (state.homeShortcutDrag?.shortcut === shortcut) {
+        shortcut.classList.add("dragging");
+      }
+    }, 0);
+  }
+
+  function onHomeShortcutDragOver(event) {
+    const drag = state.homeShortcutDrag;
+    if (!drag || drag.parent !== event.currentTarget) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const parent = event.currentTarget;
+    parent.classList.add("drag-active");
+    const candidates = $$(".home-shortcut", parent).filter(
+      (button) => button !== drag.shortcut
+    );
+    if (!candidates.length) {
+      parent.appendChild(drag.shortcut);
+      return;
+    }
+    let nearest = candidates[0];
+    let nearestDistance = Infinity;
+    candidates.forEach((button) => {
+      const rect = button.getBoundingClientRect();
+      const dx = event.clientX - (rect.left + rect.width / 2);
+      const dy = event.clientY - (rect.top + rect.height / 2);
+      const distance = dx * dx + dy * dy;
+      if (distance < nearestDistance) {
+        nearest = button;
+        nearestDistance = distance;
+      }
+    });
+    const rect = nearest.getBoundingClientRect();
+    const before =
+      event.clientY < rect.top + rect.height / 2 ||
+      (Math.abs(event.clientY - (rect.top + rect.height / 2)) < rect.height / 2 &&
+        event.clientX < rect.left + rect.width / 2);
+    if (before) parent.insertBefore(drag.shortcut, nearest);
+    else parent.insertBefore(drag.shortcut, nearest.nextElementSibling);
+  }
+
+  function onHomeShortcutDrop(event) {
+    const drag = state.homeShortcutDrag;
+    if (!drag || drag.parent !== event.currentTarget) return;
+    event.preventDefault();
+    drag.dropped = true;
+    saveLayout();
+  }
+
+  function onHomeShortcutDragEnd() {
+    const drag = state.homeShortcutDrag;
+    state.homeShortcutDrag = null;
+    const parent = $("#homeShortcuts");
+    if (parent) parent.classList.remove("drag-active");
+    if (!drag) return;
+    drag.shortcut.classList.remove("dragging");
+    state.homeShortcutClickSuppressedUntil = Date.now() + 350;
+    if (!drag.dropped) {
+      if (
+        drag.nextSibling &&
+        drag.nextSibling !== drag.shortcut &&
+        drag.nextSibling.parentElement === drag.parent
+      ) {
+        drag.parent.insertBefore(drag.shortcut, drag.nextSibling);
+      } else {
+        drag.parent.appendChild(drag.shortcut);
+      }
+    }
+  }
+
   function initDraggableLayout() {
     const saved = readSavedLayout();
+    const homeShortcuts = $("#homeShortcuts");
+    if (homeShortcuts) {
+      const homeOrder = Array.isArray(saved.homeShortcuts) ? saved.homeShortcuts : [];
+      homeOrder.forEach((page) => {
+        if (typeof page !== "string" || !/^[a-z0-9-]+$/.test(page)) return;
+        const shortcut = $$(".home-shortcut", homeShortcuts).find(
+          (button) => button.dataset.go === page
+        );
+        if (shortcut) homeShortcuts.appendChild(shortcut);
+      });
+      $$(".home-shortcut", homeShortcuts).forEach((button) => {
+        button.draggable = true;
+        button.title = "按住拖动以调整快捷入口顺序";
+        button.addEventListener("dragstart", onHomeShortcutDragStart);
+        button.addEventListener("dragend", onHomeShortcutDragEnd);
+      });
+      homeShortcuts.addEventListener("dragover", onHomeShortcutDragOver);
+      homeShortcuts.addEventListener("drop", onHomeShortcutDrop);
+    }
     $$("[data-zone]").forEach((zone) => {
       const order = Array.isArray(saved[zone.dataset.zone]) ? saved[zone.dataset.zone] : [];
       order.forEach((panelId) => {
@@ -1787,12 +2060,509 @@
     });
   }
 
+  const VIEW3D_FACES = [
+    { corners: [1, 5, 7, 3], nx: 1, ny: 0, nz: 0 },
+    { corners: [0, 2, 6, 4], nx: -1, ny: 0, nz: 0 },
+    { corners: [2, 3, 7, 6], nx: 0, ny: 1, nz: 0 },
+    { corners: [0, 1, 5, 4], nx: 0, ny: -1, nz: 0 },
+    { corners: [4, 5, 7, 6], nx: 0, ny: 0, nz: 1 },
+    { corners: [0, 1, 3, 2], nx: 0, ny: 0, nz: -1 },
+  ];
+
+  const view3d = {
+    yaw: -0.7,
+    pitch: 0.35,
+    zoom: 1.0,
+    auto: false,
+    dragging: false,
+    lastX: 0,
+    lastY: 0,
+    faces: [],
+    lines: [],
+    axisLines: [],
+    labels: [],
+  };
+
+  function view3dMatMul(a, b) {
+    const out = [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ];
+    for (let i = 0; i < 3; i += 1) {
+      for (let j = 0; j < 3; j += 1) {
+        for (let k = 0; k < 3; k += 1) {
+          out[i][j] += a[i][k] * b[k][j];
+        }
+      }
+    }
+    return out;
+  }
+
+  function view3dRotVec(m, v) {
+    return [
+      m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+      m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+      m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2],
+    ];
+  }
+
+  function view3dShade(hex, factor) {
+    const value = String(hex).replace("#", "");
+    const r = parseInt(value.slice(0, 2), 16) || 0;
+    const g = parseInt(value.slice(2, 4), 16) || 0;
+    const b = parseInt(value.slice(4, 6), 16) || 0;
+    return (
+      "rgb(" +
+      Math.round(r * factor) + "," +
+      Math.round(g * factor) + "," +
+      Math.round(b * factor) + ")"
+    );
+  }
+
+  function view3dDot(a, b) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  }
+
+  function view3dNormalize(v) {
+    const n = Math.hypot(v[0], v[1], v[2]) || 1;
+    return [v[0] / n, v[1] / n, v[2] / n];
+  }
+
+  function view3dFaceNormal(pts) {
+    const u = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1], pts[1][2] - pts[0][2]];
+    const v = [pts[2][0] - pts[0][0], pts[2][1] - pts[0][1], pts[2][2] - pts[0][2]];
+    return view3dNormalize([
+      u[1] * v[2] - u[2] * v[1],
+      u[2] * v[0] - u[0] * v[2],
+      u[0] * v[1] - u[1] * v[0],
+    ]);
+  }
+
+  function buildView3dScene(data) {
+    const nodes = data.nodes || [];
+    const byId = new Map();
+    nodes.forEach((node) => byId.set(node.id, node));
+    const world = new Map();
+    const resolve = (id) => {
+      if (world.has(id)) return world.get(id);
+      const node = byId.get(id);
+      if (!node) return null;
+      const parent = node.parent ? resolve(node.parent) : null;
+      const rot = node.dcm || [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ];
+      const pos = node.position || [0, 0, 0];
+      let wRot = rot;
+      let wPos = pos;
+      if (parent) {
+        wRot = view3dMatMul(parent.rot, rot);
+        wPos = [
+          parent.pos[0] + parent.rot[0][0] * pos[0] + parent.rot[0][1] * pos[1] + parent.rot[0][2] * pos[2],
+          parent.pos[1] + parent.rot[1][0] * pos[0] + parent.rot[1][1] * pos[1] + parent.rot[1][2] * pos[2],
+          parent.pos[2] + parent.rot[2][0] * pos[0] + parent.rot[2][1] * pos[1] + parent.rot[2][2] * pos[2],
+        ];
+      }
+      const entry = { rot: wRot, pos: wPos };
+      world.set(id, entry);
+      return entry;
+    };
+    nodes.forEach((node) => resolve(node.id));
+
+    view3d.faces = [];
+    view3d.lines = [];
+    view3d.labels = [];
+    nodes.forEach((node) => {
+      const w = world.get(node.id);
+      if (!w) return;
+      const color = node.color || "#888888";
+      const opacity = typeof node.opacity === "number" ? node.opacity : 1;
+      const localToWorld = (local) => {
+        const r = view3dRotVec(w.rot, local);
+        return [w.pos[0] + r[0], w.pos[1] + r[1], w.pos[2] + r[2]];
+      };
+      const axis = view3dRotVec(w.rot, [0, 0, 1]);
+
+      if ((node.shape || "box") === "cylinder") {
+        const radius = node.radius || 0.15;
+        const height = node.height || 0.12;
+        const segments = 14;
+        const ring = (z) => {
+          const pts = [];
+          for (let i = 0; i < segments; i += 1) {
+            const a = (Math.PI * 2 * i) / segments;
+            pts.push(
+              localToWorld([Math.cos(a) * radius, Math.sin(a) * radius, z])
+            );
+          }
+          return pts;
+        };
+        const bottom = ring(-height / 2);
+        const top = ring(height / 2);
+        for (let i = 0; i < segments; i += 1) {
+          const j = (i + 1) % segments;
+          const pts = [bottom[i], bottom[j], top[j], top[i]];
+          const center = [
+            (pts[0][0] + pts[2][0]) / 2,
+            (pts[0][1] + pts[2][1]) / 2,
+            (pts[0][2] + pts[2][2]) / 2,
+          ];
+          const normal = view3dNormalize([
+            center[0] - w.pos[0],
+            center[1] - w.pos[1],
+            center[2] - w.pos[2],
+          ]);
+          view3d.faces.push({ pts, normal, color, opacity });
+        }
+        view3d.faces.push({ pts: top, normal: axis, color, opacity });
+        view3d.faces.push({
+          pts: bottom,
+          normal: [-axis[0], -axis[1], -axis[2]],
+          color,
+          opacity,
+        });
+      } else if ((node.shape || "box") === "cone") {
+        const radius = node.radius || 0.07;
+        const height = node.height || 0.12;
+        const segments = 10;
+        const base = [];
+        for (let i = 0; i < segments; i += 1) {
+          const a = (Math.PI * 2 * i) / segments;
+          base.push(
+            localToWorld([Math.cos(a) * radius, Math.sin(a) * radius, -height / 2])
+          );
+        }
+        const apex = localToWorld([0, 0, height / 2]);
+        for (let i = 0; i < segments; i += 1) {
+          const j = (i + 1) % segments;
+          const pts = [base[i], base[j], apex];
+          const normal = view3dFaceNormal(pts);
+          const center = [
+            (pts[0][0] + pts[1][0] + pts[2][0]) / 3,
+            (pts[0][1] + pts[1][1] + pts[2][1]) / 3,
+            (pts[0][2] + pts[1][2] + pts[2][2]) / 3,
+          ];
+          const radial = [
+            center[0] - w.pos[0],
+            center[1] - w.pos[1],
+            center[2] - w.pos[2],
+          ];
+          const alongAxis =
+            radial[0] * axis[0] + radial[1] * axis[1] + radial[2] * axis[2];
+          const outward = [
+            radial[0] - alongAxis * axis[0],
+            radial[1] - alongAxis * axis[1],
+            radial[2] - alongAxis * axis[2],
+          ];
+          view3d.faces.push({
+            pts,
+            normal:
+              view3dDot(normal, outward) >= 0
+                ? normal
+                : [-normal[0], -normal[1], -normal[2]],
+            color,
+            opacity,
+          });
+        }
+        view3d.faces.push({
+          pts: base,
+          normal: [-axis[0], -axis[1], -axis[2]],
+          color,
+          opacity,
+        });
+      } else {
+        const size = node.size || [0.3, 0.3, 0.3];
+        const hx = size[0] / 2;
+        const hy = size[1] / 2;
+        const hz = size[2] / 2;
+        const corners = [];
+        for (let i = 0; i < 8; i += 1) {
+          corners.push(
+            localToWorld([i & 1 ? hx : -hx, i & 2 ? hy : -hy, i & 4 ? hz : -hz])
+          );
+        }
+        VIEW3D_FACES.forEach((face) => {
+          view3d.faces.push({
+            pts: face.corners.map((i) => corners[i]),
+            normal: view3dRotVec(w.rot, [face.nx, face.ny, face.nz]),
+            color,
+            opacity,
+          });
+        });
+        if (node.kind === "solar-array") {
+          const gridColor = "#4e8bb9";
+          const panelZ = hz + 0.012;
+          for (let i = 1; i < 5; i += 1) {
+            const y = -hy + (2 * hy * i) / 5;
+            view3d.lines.push({
+              from: localToWorld([-hx, y, panelZ]),
+              to: localToWorld([hx, y, panelZ]),
+              color: gridColor,
+              width: 0.8,
+              alpha: 0.65,
+            });
+          }
+          for (let i = 1; i < 4; i += 1) {
+            const x = -hx + (2 * hx * i) / 4;
+            view3d.lines.push({
+              from: localToWorld([x, -hy, panelZ]),
+              to: localToWorld([x, hy, panelZ]),
+              color: gridColor,
+              width: 0.8,
+              alpha: 0.65,
+            });
+          }
+        }
+      }
+
+      if (node.direction) {
+        const d = node.direction;
+        const wd = view3dRotVec(w.rot, d);
+        view3d.lines.push({
+          from: [w.pos[0] - wd[0] * 0.2, w.pos[1] - wd[1] * 0.2, w.pos[2] - wd[2] * 0.2],
+          to: [w.pos[0] + wd[0] * 0.8, w.pos[1] + wd[1] * 0.8, w.pos[2] + wd[2] * 0.8],
+          color: "#e74c3c",
+        });
+      }
+    });
+    view3d.axisLines = [
+      { from: [0, 0, 0], to: [2.2, 0, 0], color: "#e06c6c" },
+      { from: [0, 0, 0], to: [0, 4.8, 0], color: "#6cd08b" },
+      { from: [0, 0, 0], to: [0, 0, 1.8], color: "#6c9fe0" },
+    ];
+    view3d.labels.push({ pos: [2.35, 0, 0], text: "X", color: "#e06c6c" });
+    view3d.labels.push({ pos: [0, 4.95, 0], text: "Y", color: "#6cd08b" });
+    view3d.labels.push({ pos: [0, 0, 1.95], text: "Z", color: "#6c9fe0" });
+  }
+
+  function drawView3d() {
+    const canvas = $("#view3dCanvas");
+    if (!canvas) return;
+    const width = canvas.clientWidth || canvas.width;
+    const height = canvas.clientHeight || canvas.height;
+    if (width < 4 || height < 4) return;
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.floor(width * ratio));
+    canvas.height = Math.max(1, Math.floor(height * ratio));
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.clearRect(0, 0, width, height);
+
+    const cx = width / 2;
+    const cy = height / 2;
+    let sceneRadius = 1;
+    view3d.faces.forEach((face) => {
+      face.pts.forEach((point) => {
+        sceneRadius = Math.max(
+          sceneRadius,
+          Math.hypot(point[0], point[1], point[2])
+        );
+      });
+    });
+    const scale = (Math.min(width, height) * 0.39) / sceneRadius;
+    const dist = Math.max(8, sceneRadius * 3.2);
+    const cyaw = Math.cos(view3d.yaw);
+    const syaw = Math.sin(view3d.yaw);
+    const cpitch = Math.cos(view3d.pitch);
+    const spitch = Math.sin(view3d.pitch);
+
+    const view = (p) => {
+      const y1 = cpitch * p[1] - spitch * p[2];
+      const z1 = spitch * p[1] + cpitch * p[2];
+      return [cyaw * p[0] + syaw * z1, y1, -syaw * p[0] + cyaw * z1];
+    };
+    const project = (p) => {
+      const v = view(p);
+      const persp = view3d.zoom * dist / (dist - v[2]);
+      return [cx + v[0] * persp * scale, cy - v[1] * persp * scale, v[2]];
+    };
+
+    const lx = 0.45;
+    const ly = -0.6;
+    const lz = 0.65;
+    const lnorm = Math.hypot(lx, ly, lz);
+
+    const faces = [];
+    view3d.faces.forEach((face) => {
+      const normal = view(face.normal);
+      if (normal[2] <= 0) return;
+      const pts = face.pts.map(project);
+      let depth = 0;
+      pts.forEach((point) => {
+        depth += point[2];
+      });
+      depth /= pts.length;
+      const light = Math.max(
+        0,
+        view3dDot(face.normal, [lx, ly, lz]) / lnorm
+      );
+      faces.push({ pts, depth, light, color: face.color, opacity: face.opacity || 1 });
+    });
+    faces.sort((p, q) => q.depth - p.depth);
+    faces.forEach((face) => {
+      ctx.globalAlpha = face.opacity;
+      const shade = 0.42 + 0.58 * face.light;
+      ctx.fillStyle = view3dShade(face.color, shade);
+      ctx.beginPath();
+      ctx.moveTo(face.pts[0][0], face.pts[0][1]);
+      for (let i = 1; i < face.pts.length; i += 1) {
+        ctx.lineTo(face.pts[i][0], face.pts[i][1]);
+      }
+      ctx.closePath();
+      ctx.fill();
+      if (face.opacity >= 1) {
+        ctx.strokeStyle = "rgba(0,0,0,0.4)";
+        ctx.lineWidth = 0.7;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    });
+
+    view3d.lines.forEach((line) => {
+      const a = project(line.from);
+      const b = project(line.to);
+      ctx.globalAlpha = line.alpha === undefined ? 1 : line.alpha;
+      ctx.strokeStyle = line.color;
+      ctx.lineWidth = line.width || 2;
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+    view3d.axisLines.forEach((line) => {
+      const a = project(line.from);
+      const b = project(line.to);
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = line.color;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    });
+    view3d.labels.forEach((label) => {
+      const p = project(label.pos);
+      ctx.fillStyle = label.color;
+      ctx.font = "12px Consolas, monospace";
+      ctx.fillText(label.text, p[0] + 4, p[1] - 4);
+    });
+  }
+
+  function view3dFrame() {
+    const page = $("#page-view3d");
+    if (page && page.classList.contains("active")) {
+      if (view3d.auto) view3d.yaw += 0.006;
+      drawView3d();
+    }
+    requestAnimationFrame(view3dFrame);
+  }
+
+  function renderView3dInfo(data) {
+    $("#view3dMeta").textContent =
+      data.summary ||
+      "总质量 " + (data.mass_kg ?? "-") + " kg · " +
+      (data.nodes || []).length + " 个部件";
+    $("#view3dInfo").innerHTML = (data.info || [])
+      .map(
+        (item) =>
+          '<tr><th scope="row">' + escapeHtml(item.label) + "</th><td>" +
+          escapeHtml(item.value) + "</td></tr>"
+      )
+      .join("");
+  }
+
+  async function loadView3dModel(expand = "") {
+    if (state.view3dLoading) return;
+    state.view3dLoading = true;
+    const message = $("#view3dMessage");
+    message.className = "hint";
+    message.textContent = "正在加载 Starlink V3 概念模型...";
+    try {
+      const data = await api(
+        "/api/spacecraft/model?model=starlink-v3" +
+          (expand === "" ? "" : "&expand=" + expand),
+        { timeoutMs: 30000 }
+      );
+      state.view3dModel = data;
+      renderView3dInfo(data);
+      buildView3dScene(data);
+      message.textContent = "";
+    } catch (error) {
+      message.className = "hint error-text";
+      message.textContent = error.message;
+    } finally {
+      state.view3dLoading = false;
+    }
+  }
+
+  function initView3d() {
+    const canvas = $("#view3dCanvas");
+    if (!canvas) return;
+    canvas.addEventListener("pointerdown", (event) => {
+      view3d.dragging = true;
+      view3d.lastX = event.clientX;
+      view3d.lastY = event.clientY;
+      try {
+        canvas.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // 合成事件或已释放指针时忽略
+      }
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (!view3d.dragging) return;
+      view3d.yaw += (event.clientX - view3d.lastX) * 0.01;
+      view3d.pitch += (event.clientY - view3d.lastY) * 0.01;
+      view3d.pitch = Math.max(-1.5, Math.min(1.5, view3d.pitch));
+      view3d.lastX = event.clientX;
+      view3d.lastY = event.clientY;
+    });
+    const endDrag = () => {
+      view3d.dragging = false;
+    };
+    canvas.addEventListener("pointerup", endDrag);
+    canvas.addEventListener("pointercancel", endDrag);
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        event.preventDefault();
+        view3d.zoom = Math.max(
+          2.2,
+          Math.min(14, view3d.zoom * Math.exp(-event.deltaY * 0.001))
+        );
+      },
+      { passive: false }
+    );
+    $("#view3dReset").addEventListener("click", () => {
+      view3d.yaw = -0.7;
+      view3d.pitch = 0.35;
+      view3d.zoom = 1.0;
+    });
+    $("#view3dAuto").addEventListener("click", () => {
+      view3d.auto = !view3d.auto;
+      $("#view3dAuto").classList.toggle("pressed", view3d.auto);
+    });
+    $("#view3dExpand").addEventListener("change", () => {
+      loadView3dModel($("#view3dExpand").value);
+    });
+    requestAnimationFrame(view3dFrame);
+  }
+
   function bind() {
     $$(".nav-btn").forEach((button) => {
       button.addEventListener("click", () => switchPage(button.dataset.page));
     });
     $$(".home-shortcut").forEach((button) => {
-      button.addEventListener("click", () => switchPage(button.dataset.go));
+      button.addEventListener("click", (event) => {
+        if (Date.now() < state.homeShortcutClickSuppressedUntil) {
+          event.preventDefault();
+          return;
+        }
+        switchPage(button.dataset.go);
+      });
     });
     $("#dataWarningClose").addEventListener("click", () => {
       $("#dataWarning").classList.add("hidden");
@@ -1820,6 +2590,17 @@
       $("#j2000Message").className = "hint";
       $("#j2000Message").textContent = "";
     });
+    $("#rv18Mode").addEventListener("change", () => {
+      const rvtToEph = $("#rv18Mode").value === "rvt2eph";
+      $("#rv18RvtInput").hidden = !rvtToEph;
+      $("#rv18EphInput").hidden = rvtToEph;
+      $("#rv18Message").className = "hint";
+      $("#rv18Message").textContent = "";
+      $("#rv18Output").value = "";
+      $("#copyRv18").disabled = true;
+    });
+    $("#runRv18").addEventListener("click", runRv18Conversion);
+    $("#copyRv18").addEventListener("click", copyRv18Result);
     $("#copyAps").addEventListener("click", () => {
       const content = $("#copyAps").dataset.text;
       if (content) {
@@ -1853,6 +2634,7 @@
     initDraggableLayout();
     initWalle();
     initWalleText();
+    initView3d();
     const page = pageFromHash();
     switchPage(page, false);
     await loadInfo();

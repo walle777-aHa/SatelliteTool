@@ -2443,7 +2443,7 @@ def _rv_to_18_initial(r: List[float], v: List[float]) -> List[float]:
         raise ApiError(400, "RVT 角动量接近 0，无法拟合轨道")
     energy = 2.0 / rmag - vmag * vmag / EARTH_MU_SI
     if energy <= 0:
-        raise ApiError(400, "18 参数模型仅支持负能量椭圆轨道")
+        raise ApiError(400, "18Eph 模型仅支持负能量椭圆轨道")
     a = 1.0 / energy
     inclination = math.atan2(math.hypot(h[0], h[1]), h[2])
     omega0 = math.atan2(h[0], -h[1]) % (2.0 * math.pi)
@@ -2455,7 +2455,7 @@ def _rv_to_18_initial(r: List[float], v: List[float]) -> List[float]:
     e_sin_e = _vec_dot(r, v) / math.sqrt(EARTH_MU_SI * a)
     eccentricity = math.hypot(e_cos_e, e_sin_e)
     if not 0 <= eccentricity < 1:
-        raise ApiError(400, "18 参数模型要求偏心率满足 0 ≤ e < 1")
+        raise ApiError(400, "18Eph 模型要求偏心率满足 0 ≤ e < 1")
     eccentric_anomaly = math.atan2(e_sin_e, e_cos_e)
     mean_anomaly = (eccentric_anomaly - e_sin_e) % (2.0 * math.pi)
     true_anomaly = math.atan2(
@@ -2485,12 +2485,12 @@ def _rv_to_18_initial(r: List[float], v: List[float]) -> List[float]:
 
 
 def _cal_18_state(p: List[float], tk: float) -> Tuple[List[float], List[float], List[List[float]]]:
-    """Evaluate the ** 18-parameter position, velocity and position Jacobian."""
+    """Evaluate the ** 18Eph position, velocity and position Jacobian."""
     a0, eccentricity = p[0], p[1]
     if a0 <= 0 or not 0 <= eccentricity < 1:
-        raise ApiError(400, "18 参数需要 a > 0 且 0 ≤ e < 1")
+        raise ApiError(400, "18Eph 需要 a > 0 且 0 ≤ e < 1")
     if not all(math.isfinite(value) for value in p):
-        raise ApiError(400, "18 参数必须为有限数值")
+        raise ApiError(400, "18Eph 必须为有限数值")
 
     inclination0, omega0, arg_perigee0, mean0 = p[2], p[3], p[4], p[5]
     delta_n, omega_dot, inclination_dot = p[6], p[7], p[8]
@@ -2604,7 +2604,7 @@ def _solve_dense_linear(matrix: List[List[float]], rhs: List[float]) -> List[flo
     for col in range(n):
         pivot = max(range(col, n), key=lambda row: abs(a[row][col]))
         if abs(a[pivot][col]) < 1e-24:
-            raise ApiError(422, "18 参数拟合矩阵奇异；请检查轨道弧段或输入数据")
+            raise ApiError(422, "18Eph 拟合矩阵奇异；请检查轨道弧段或输入数据")
         a[col], a[pivot] = a[pivot], a[col]
         divisor = a[col][col]
         for j in range(col, n + 1):
@@ -2716,7 +2716,7 @@ def _fit_rvt_to_18(samples: List[Tuple[List[float], List[float]]], toe: float) -
 
 
 def convert_rvt18(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Convert RVT and GNC 18-parameter ephemeris using pure Python.
+    """Convert RVT and 18Eph using pure Python.
 
     This endpoint does not invoke MATLAB, MATLAB Runtime, or any external
     MATLAB scripts; the orbital model and least-squares fit run in-process.
@@ -2773,17 +2773,17 @@ def convert_rvt18(body: Dict[str, Any]) -> Dict[str, Any]:
 
     raw_parameters = body.get("parameters")
     if not isinstance(raw_parameters, list) or len(raw_parameters) != 18:
-        raise ApiError(400, "18 参数输入必须正好包含 18 个数值")
+        raise ApiError(400, "18Eph 输入必须正好包含 18 个数值")
     try:
         parameters = [float(value) for value in raw_parameters]
     except (TypeError, ValueError):
-        raise ApiError(400, "18 参数必须全部为数字")
+        raise ApiError(400, "18Eph 必须全部为数字")
     if not all(math.isfinite(value) for value in parameters):
-        raise ApiError(400, "18 参数必须全部为有限数值")
+        raise ApiError(400, "18Eph 必须全部为有限数值")
     if parameters[0] <= 0 or not 0 <= parameters[1] < 1:
-        raise ApiError(400, "18 参数要求 a > 0 且 0 ≤ e < 1")
+        raise ApiError(400, "18Eph 要求 a > 0 且 0 ≤ e < 1")
     if parameters[17] < 0 or parameters[17] >= BDT_WEEK_S:
-        raise ApiError(400, "第 18 参数 toe 必须是 0 至 604800 秒内的 BDT 周内秒")
+        raise ApiError(400, "18Eph 第 18 项 toe 必须是 0 至 604800 秒内的 BDT 周内秒")
     try:
         bdt_week = int(body.get("bdt_week"))
     except (TypeError, ValueError):

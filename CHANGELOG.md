@@ -6,7 +6,8 @@
 
 - 首页快捷功能图标支持拖动排序，排序结果与其他可拖动布局一起保存在浏览器
   localStorage；
-- 新增“惯性系 RVT ↔ 18 参数”页面及 `POST /api/rv18/convert`：按 `**`
+- 首页新增“RVT ↔ 18Eph”快捷入口，可直达惯性系 18Eph 拟合/递推页面；
+- 新增“惯性系 RVT ↔ 18Eph”页面及 `POST /api/rv18/convert`：按 `**`
   模型对 60 组一分钟间隔数据拟合/递推，支持 km 与 SI 单位，输出 BDT 历元及拟合 RMS；
 - F10.7 空间环境页：NASA OMNI2 最新日值、81 天均值和近半年曲线，
   支持复制曲线 CSV；
@@ -35,7 +36,7 @@
   `POST /api/orbit/convert`、`GET /api/spacecraft/model`；
   保存接口同时返回国家分组；
 - 单元测试扩展到 46 项，覆盖 NORAD 保存/删除、国家分组、最新发射解析、
-  J2000 RV 六根数互转、RVT/18 参数互转、Starlink V3 概念模型和 F10.7 解析。
+  J2000 RV 六根数互转、RVT/18Eph 互转、Starlink V3 概念模型和 F10.7 解析。
 
 ## 0.2.0 - 2026-11-15
 

@@ -50,7 +50,7 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
 
 ## 2. 功能
 
-- **首页**：纯黑背景、六个可拖动排序的快捷入口和 WALL-E 风格机器人；
+- **首页**：纯黑背景、七个可拖动排序的快捷入口和 WALL-E 风格机器人；
   拖动后的入口顺序保存在浏览器 localStorage；机器人从上下左右任一边完全
   离开后都会从对侧进入，并支持方向键控制；
 - **仿真**：选择场景、仿真时长和 CSV 配置，运行 `BlueSpace.exe`；
@@ -58,8 +58,8 @@ Python 依赖只有标准库；Node.js 仅用于可选的 `node --check static/a
 - **轨道转换**：调用 `ApsOrbitTool.exe`，结果表随输入方向显示“输入/输出”
   两列（输出列高亮），一键复制方向对应的输出参数；页面下方另有 J2000 RV
   与六根数（`a/e/i/Ω/ω/M`）的双向转换；
-- **惯性系 RVT ↔ 18 参数**：按 `**` 模型定义进行 60 组、每分钟采样的
-  J2000 惯性系 RVT 与 18 参数互转；支持 km/km·s⁻¹ 或 m/m·s⁻¹ 输入、
+- **惯性系 RVT ↔ 18Eph**：按 `**` 模型定义进行 60 组、每分钟采样的
+  J2000 惯性系 RVT 与 18Eph 互转；支持 km/km·s⁻¹ 或 m/m·s⁻¹ 输入、
   起始 UTC/BDT 历元、拟合误差显示与结果复制；
 - **TLE 递推**：调用 `Sgp4EcefTool.exe`，输出地固系位置/速度，结果表支持
   一键复制 CSV 数据；
@@ -201,11 +201,11 @@ SatelliteTool/
 J2000 位置速度。引力常数 μ 默认 398600.4418 km³/s²，可修改；仅支持椭圆
 轨道（`e < 1`），结果可一键复制。
 
-### 惯性系 RVT ↔ 18 参数
+### 惯性系 RVT ↔ 18Eph
 
-页面按 `**` 的 18 参数模型转换 60 组、间隔 60 秒的 J2000 惯性系
-RVT。RVT → 18 参数使用首组 RV 初始化，按 60 个位置残差作最小二乘拟合；
-速度用于初始化轨道根数。18 参数 → RVT 按解析模型从起始历元递推 60 个样本。
+页面按 `**` 的 18Eph 模型转换 60 组、间隔 60 秒的 J2000 惯性系
+RVT。RVT → 18Eph 使用首组 RV 初始化，按 60 个位置残差作最小二乘拟合；
+速度用于初始化轨道根数。18Eph → RVT 按解析模型从起始历元递推 60 个样本。
 转换和拟合均由 `app.py` 中的 Python 实现完成，不调用 MATLAB、MATLAB Runtime
 或目录中的 `.m` 脚本；该目录仅作为算法定义与字段约定的参考。
 
@@ -214,7 +214,7 @@ RVT 输入支持每行 `Rx,Ry,Rz,Vx,Vy,Vz` 六列，或首列加时间的七列�
 （GNC 算法内部单位）。起始时间按 UTC 输入，转换 BDT 周时使用 GNC 代码约定
 `BDT = UTC + 4 s`。反向需另填 BDT 周和 18 个数值。
 
-18 参数顺序与 GNC 拟合向量一致：
+18Eph 字段顺序与拟合向量一致：
 `a, e, i0, Ω0, ω, M0, Δn0, Ωdot, idot, Cus, Cuc, Cis, Cic, Crs, Crc, Adot, Δndot, toe`。
 角度及角度改正为 rad，时间导数为 rad/s 或 rad/s²，长度为 m，`toe` 为 BDT
 周内秒；BDT 周单独填写。此转换面向椭圆轨道，输出拟合 RMS（m）与 60 行 RVT CSV。
@@ -292,7 +292,7 @@ RVT 输入支持每行 `Rx,Ry,Rz,Vx,Vy,Vz` 六列，或首列加时间的七列�
 | DELETE | `/api/jobs` | 清理所有非运行中任务 |
 | POST | `/api/aps` | APS 转换 |
 | POST | `/api/orbit/convert` | J2000 RV 与六根数互转 |
-| POST | `/api/rv18/convert` | 惯性系 RVT 与 GNC 18 参数互转 |
+| POST | `/api/rv18/convert` | 惯性系 RVT 与 18Eph 互转 |
 | POST | `/api/sgp4` | SGP4 递推 |
 | POST | `/api/celestrak` | TLE 查询 |
 

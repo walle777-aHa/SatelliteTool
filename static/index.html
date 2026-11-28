@@ -19,7 +19,7 @@
       <button class="nav-btn active" data-page="home">首页</button>
       <button class="nav-btn" data-page="sim">仿真</button>
       <button class="nav-btn" data-page="aps">轨道转换</button>
-      <button class="nav-btn" data-page="rv18">RVT ↔ 18参数</button>
+      <button class="nav-btn" data-page="rv18">RVT ↔ 18Eph</button>
       <button class="nav-btn" data-page="tle">TLE 递推</button>
       <button class="nav-btn" data-page="query">TLE 查询</button>
       <button class="nav-btn" data-page="view3d">三维显示</button>
@@ -70,6 +70,11 @@
             <span class="shortcut-icon shortcut-orbit">APS</span>
             <span class="shortcut-label">轨道转换</span>
             <span class="shortcut-desc">瞬根 ↔ 平根</span>
+          </button>
+          <button class="home-shortcut" data-go="rv18">
+            <span class="shortcut-icon shortcut-rv18">18E</span>
+            <span class="shortcut-label">RVT ↔ 18Eph</span>
+            <span class="shortcut-desc">惯性系 · 60 分钟拟合/递推</span>
           </button>
           <button class="home-shortcut" data-go="tle">
             <span class="shortcut-icon shortcut-tle">TLE</span>
@@ -297,7 +302,7 @@
       <div class="page-head">
         <div>
           <p class="eyebrow">EPHEMERIS FIT</p>
-          <h2>惯性系 RVT ↔ 18 参数</h2>
+          <h2>惯性系 RVT ↔ 18Eph</h2>
         </div>
         <span class="hint">J2000 惯性系 · 60 组 · 1 分钟间隔</span>
       </div>
@@ -309,8 +314,8 @@
           <label class="field">
             <span>转换方向</span>
             <select id="rv18Mode">
-              <option value="rvt2eph">60 组 RVT → 18 参数（拟合）</option>
-              <option value="eph2rvt">18 参数 → 60 组 RVT（递推）</option>
+              <option value="rvt2eph">60 组 RVT → 18Eph（拟合）</option>
+              <option value="eph2rvt">18Eph → 60 组 RVT（递推）</option>
             </select>
           </label>
           <label class="field">
@@ -336,7 +341,7 @@
               <input id="rv18BdtWeek" type="number" min="0" step="1" value="974">
             </label>
             <label class="field">
-              <span>18 参数（按下表顺序；每行一个，或逗号分隔）</span>
+              <span>18Eph（按下表顺序；每行一个，或逗号分隔）</span>
               <textarea id="rv18Parameters" rows="12" spellcheck="false" placeholder="a（m）&#10;e&#10;i0（rad）&#10;Omega0（rad）&#10;omega（rad）&#10;M0（rad）&#10;delta_n0（rad/s）&#10;Omega_dot（rad/s）&#10;i0_dot（rad/s）&#10;Cus（rad）&#10;Cuc（rad）&#10;Cis（rad）&#10;Cic（rad）&#10;Crs（m）&#10;Crc（m）&#10;A_dot（m/s）&#10;delta_n0_dot（rad/s^2）&#10;toe（BDT 周内秒）"></textarea>
             </label>
           </div>
@@ -353,13 +358,13 @@
           <textarea id="rv18Output" class="rv18-output" rows="22" readonly placeholder="转换结果将显示在这里"></textarea>
         </section>
       </div>
-      <section class="panel rv18-parameter-panel">
+      <section class="panel rv18eph-panel">
         <div class="panel-head">
-          <div class="panel-title">18 参数定义（与 ** 顺序一致）</div>
+          <div class="panel-title">18Eph 字段定义（与 ** 顺序一致）</div>
           <span class="hint">地心引力常数 μ = 3.986004418×10¹⁴ m³/s²</span>
         </div>
         <div class="table-wrap">
-          <table class="rv18-parameter-table">
+          <table class="rv18eph-table">
             <thead><tr><th scope="col">序号</th><th scope="col">参数</th><th scope="col">单位</th><th scope="col">说明</th></tr></thead>
             <tbody>
               <tr><td>1</td><td>a</td><td>m</td><td>参考半长轴</td></tr>
@@ -373,7 +378,7 @@
             </tbody>
           </table>
         </div>
-        <p class="hint">RVT → 18 参数按 ** 的惯性系位置残差最小二乘拟合。输入为 60 组等间隔位置/速度；速度用于初值，拟合残差使用位置。</p>
+        <p class="hint">RVT → 18Eph 按 ** 的惯性系位置残差最小二乘拟合。输入为 60 组等间隔位置/速度；速度用于初值，拟合残差使用位置。</p>
       </section>
     </section>
 

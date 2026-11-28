@@ -1075,7 +1075,7 @@
       .filter(Boolean)
       .map(Number);
     if (values.length !== 18 || values.some((value) => !Number.isFinite(value))) {
-      throw new Error("18 参数需按定义顺序输入 18 个有限数值");
+      throw new Error("18Eph 需按定义顺序输入 18 个有限数值");
     }
     return values;
   }
@@ -1126,7 +1126,7 @@
           ),
         ].join("\n");
         message.textContent =
-          "完成：1 组 18 参数 · 拟合 RMS " +
+          "完成：1 组 18Eph · 拟合 RMS " +
           Number(result.fit_error_rms_m).toFixed(4) +
           " m" +
           (result.converged ? "" : "（迭代未完全收敛）");
@@ -1162,7 +1162,7 @@
   async function copyRv18Result() {
     const content = $("#rv18Output").value;
     if (!content) return;
-    await copyText(content, "已复制 RVT / 18 参数结果");
+    await copyText(content, "已复制 RVT / 18Eph 结果");
   }
 
   async function submitTle(event) {
@@ -2023,13 +2023,33 @@
     const homeShortcuts = $("#homeShortcuts");
     if (homeShortcuts) {
       const homeOrder = Array.isArray(saved.homeShortcuts) ? saved.homeShortcuts : [];
+      const current = $$(".home-shortcut", homeShortcuts);
+      const ordered = [];
       homeOrder.forEach((page) => {
         if (typeof page !== "string" || !/^[a-z0-9-]+$/.test(page)) return;
-        const shortcut = $$(".home-shortcut", homeShortcuts).find(
-          (button) => button.dataset.go === page
-        );
-        if (shortcut) homeShortcuts.appendChild(shortcut);
+        const shortcut = current.find((button) => button.dataset.go === page);
+        if (shortcut && !ordered.includes(shortcut)) ordered.push(shortcut);
       });
+      current.forEach((shortcut, defaultIndex) => {
+        if (ordered.includes(shortcut)) return;
+        const nextSaved = current
+          .slice(defaultIndex + 1)
+          .find((candidate) => ordered.includes(candidate));
+        if (nextSaved) {
+          ordered.splice(ordered.indexOf(nextSaved), 0, shortcut);
+          return;
+        }
+        const previousSaved = current
+          .slice(0, defaultIndex)
+          .reverse()
+          .find((candidate) => ordered.includes(candidate));
+        if (previousSaved) {
+          ordered.splice(ordered.indexOf(previousSaved) + 1, 0, shortcut);
+        } else {
+          ordered.push(shortcut);
+        }
+      });
+      ordered.forEach((shortcut) => homeShortcuts.appendChild(shortcut));
       $$(".home-shortcut", homeShortcuts).forEach((button) => {
         button.draggable = true;
         button.title = "按住拖动以调整快捷入口顺序";

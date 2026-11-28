@@ -840,6 +840,7 @@ td { color: #cfd9e5; }
 .shortcut-orbit { background: linear-gradient(135deg, #8aa8ff, #5c70d8); color: #06111f; }
 .shortcut-tle { background: linear-gradient(135deg, #ffc857, #f09b3e); color: #201304; }
 .shortcut-query { background: linear-gradient(135deg, #c084fc, #7c5ce0); color: #120821; }
+.shortcut-rv18 { background: linear-gradient(135deg, #f0abfc, #a855f7); color: #1a0b22; }
 .shortcut-view3d { background: linear-gradient(135deg, #6ee7b7, #2f9e6e); color: #04120f; }
 .shortcut-f107 { background: linear-gradient(135deg, #ffc857, #ff7a59); color: #211006; }
 
@@ -1182,11 +1183,11 @@ td { color: #cfd9e5; }
   font: 11px/1.5 Consolas, "Cascadia Mono", monospace;
 }
 
-.rv18-parameter-table td {
+.rv18eph-table td {
   white-space: normal;
 }
 
-.rv18-parameter-table th:first-child {
+.rv18eph-table th:first-child {
   width: 70px;
 }
 

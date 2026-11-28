@@ -148,11 +148,11 @@ RV → 六根数：
 
 ### `POST /api/rv18/convert`
 
-将 `**` 格式的 18 参数与 60 组 J2000 惯性系 RVT 相互转换。
+将 `**` 格式的 18Eph 与 60 组 J2000 惯性系 RVT 相互转换。
 状态递推、拟合与线性方程求解均由 Python 进程内实现；不调用 MATLAB、
 MATLAB Runtime 或 `.m` 脚本。
 
-RVT → 18 参数：
+RVT → 18Eph：
 
 ```json
 {
@@ -167,12 +167,12 @@ RVT → 18 参数：
 
 `rvt` 实际必须提供 60 行，每行依次是 `Rx,Ry,Rz,Vx,Vy,Vz`。也可在前端粘贴
 带首列时间的 7 列数据；时间列需每行间隔 60 秒。`units` 可为 `km`（位置 km、
-速度 km/s）或 `m`（位置 m、速度 m/s）。RVT → 18 参数用位置残差最小二乘拟合，
+速度 km/s）或 `m`（位置 m、速度 m/s）。RVT → 18Eph 用位置残差最小二乘拟合，
 速度仅用于初始轨道根数；响应包含 `parameters`（18 项）、`bdt_week`、
 `fit_error_rms_m`、`iterations` 和 `converged`。UTC 转 BDT 按 GNC 代码中的
-`BDT = UTC + 4 s`，BDT 周内秒为第 18 参数 `toe`。
+`BDT = UTC + 4 s`，BDT 周内秒为 18Eph 第 18 项 `toe`。
 
-18 参数 → RVT：
+18Eph → RVT：
 
 ```json
 {
